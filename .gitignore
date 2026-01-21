@@ -51,6 +51,7 @@ env/
 ENV/
 .env/
 .venv/
+.env
 
 # IDE/editor configs
 .vscode/

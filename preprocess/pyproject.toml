@@ -1,0 +1,21 @@
+[project]
+name = "preprocess"
+version = "0.1.0"
+description = "식당 데이터를 수집하고 정제하기 위한 전처리프로세"
+authors = [
+    {name = "James0103",email = "jameshhjung@gmail.com"}
+]
+requires-python = "3.12.3"
+dependencies = [
+    "playwright (>=1.57.0,<2.0.0)",
+    "requests (>=2.32.5,<3.0.0)",
+    "python-dotenv (>=1.2.1,<2.0.0)",
+    "pytest (>=9.0.2,<10.0.0)",
+]
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry]
+package-mode = false
