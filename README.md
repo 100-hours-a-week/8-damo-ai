@@ -2,6 +2,8 @@
 
 LangGraph 기반의 멀티 기능 AI 백엔드 서비스입니다.
 - new-feature
+- new-feature2
+- new-feature3
 
 ## 📁 프로젝트 구조
 
