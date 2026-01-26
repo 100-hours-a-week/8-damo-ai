@@ -1,6 +1,7 @@
 # Restaurant Service - AI Pipeline
 
-FastAPI 기반의 AI 파이프라인 구성입니다.
+LangGraph 기반의 멀티 기능 AI 백엔드 서비스입니다.
+- new-feature
 
 ### 설치
 
