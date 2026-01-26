@@ -41,11 +41,6 @@ if [ -z "$INCOMING_TAR" ] || [ ! -f "$INCOMING_TAR" ]; then
   exit 2
 fi
 
-if [ ! -f "$ECOSYSTEM" ]; then
-  echo "ERROR: ecosystem file not found: $ECOSYSTEM"
-  exit 1
-fi
-
 mkdir -p "$BASE_DIR/incoming" "$BASE_DIR/backup"
 
 # 1) 기존 앱 중지
@@ -84,6 +79,13 @@ if [ ! -f "$DEPLOY_DIR/requirements.txt" ]; then
   echo "ERROR: requirements.txt not found in $DEPLOY_DIR"
   exit 1
 fi
+
+if [ ! -f "$DEPLOY_DIR/ecosystem.ai.config.js" ]; then
+  echo "ERROR: ecosystem.ai.config.js not found in $DEPLOY_DIR"
+  ls -al "$DEPLOY_DIR" || true
+  exit 1
+fi
+ECOSYSTEM="$DEPLOY_DIR/ecosystem.ai.config.js"
 
 # FastAPI 엔트리 검증
 if [ ! -f "$DEPLOY_DIR/main.py" ]; then
