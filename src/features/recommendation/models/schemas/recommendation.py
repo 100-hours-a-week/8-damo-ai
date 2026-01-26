@@ -82,7 +82,7 @@ class AnalyzeRefreshRequest(RecommendationRequest):
     """
 
     model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
-    dining_id: int = Field(..., description="회식 id")
+    # dining_id는 dining_data 내부에 포함되어 있으므로 제거
     vote_result_list: List[RestaurantVoteResult] = Field(
         ..., description="식당 투표 결과 리스트"
     )

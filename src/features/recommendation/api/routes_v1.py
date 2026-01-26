@@ -97,10 +97,10 @@ async def analyze_refresh(recommendation_request: AnalyzeRefreshRequest):
     """
     식당 재추천시 호출하는 API로 내부 그래프 처리 후 최종 5개의 식당 정보를 반환합니다.
     """
-    if recommendation_request.dining_id is None:
+    if recommendation_request.dining_data.dining_id is None:
         return JSONResponse(
             status_code=400,
-            content={"message": "diningId is required"},
+            content={"message": "diningData.diningId is required"},
         )
 
     # analyze_refresh는 재추천이므로 is_refresh=True로 가정.

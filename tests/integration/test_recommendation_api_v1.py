@@ -85,7 +85,6 @@ def test_analyze_refresh():
             "budget": 50000,
         },
         "userIds": [123456789],
-        "diningId": 1,
         "voteResultList": [],
     }
 
