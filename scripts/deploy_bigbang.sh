@@ -24,7 +24,7 @@ ECOSYSTEM="$DEPLOY_DIR/ecosystem.ai.config.js"
 
 APP_NAME="fastapi-app"                  # pm2 프로세스명
 PORT="8000"
-HEALTH_URL="http://localhost:${PORT}/ai/apihealth" 
+HEALTH_URL="http://localhost:${PORT}/ai/api/health" 
 
 MAX_WAIT=60
 SLEEP=2
