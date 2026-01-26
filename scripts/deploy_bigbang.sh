@@ -93,6 +93,16 @@ if [ ! -f "$DEPLOY_DIR/main.py" ]; then
   exit 1
 fi
 
+# 3-3) deps install (venv)
+echo "3-3) venv 생성 및 의존성 설치..."
+cd "$DEPLOY_DIR"
+
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -U pip
+pip install -r requirements.txt
+deactivate
+
 # 4) PM2 재기동 
 echo "4) PM2로 재기동..."
 pm2 delete "$APP_NAME" >/dev/null 2>&1 || true
