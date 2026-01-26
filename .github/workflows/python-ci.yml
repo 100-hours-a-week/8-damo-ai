@@ -6,6 +6,18 @@ on:
   pull_request:
     branches: [ main, dev ]
 
+env:
+  HOST: ${{ secrets.AI_PROD_SERVER_HOST }}
+  USER: ${{ secrets.AI_PROD_SERVER_USER }}
+  PORT: ${{ secrets.AI_PROD_SERVER_PORT }}
+  KEY: ${{ secrets.AI_PROD_SERVER_KEY }}
+
+  REMOTE_DIR: /home/ubuntu/opt/ai-prod
+  INCOMING_DIR: /home/ubuntu/opt/ai-prod/incoming
+
+  ARTIFACT_FILE: ai-app.tar.gz
+  DEPLOY_SCRIPT: scripts/deploy_bigbang.sh
+
 jobs:
   test:
     runs-on: ubuntu-latest
