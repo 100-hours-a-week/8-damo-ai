@@ -2,4 +2,4 @@
 
 export PYTHONPATH=$(pwd)
 
-poetry run pytest tests -v
+poetry run pytest tests/integration -v

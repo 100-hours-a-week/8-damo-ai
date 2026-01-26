@@ -1,10 +1,11 @@
 from fastapi import FastAPI, APIRouter
 import uvicorn
+from src.features.recommendation.models.schemas.user import UserData
 
 app = FastAPI(title="Damo AI Pipeline API", version="0.0.1")
 
 
-@app.get("/")
+@app.get("ai/api")
 async def root():
     """루트 엔드포인트 - 간단한 환영 메시지"""
     return {
@@ -13,7 +14,7 @@ async def root():
     }
 
 
-@app.get("/health")
+@app.get("ai/api/health")
 async def health_check():
     """헬스체크 엔드포인트"""
     return {
@@ -52,3 +53,10 @@ if __name__ == "__main__":
         port=8000,
         reload=True
     )
+    # # OpenAPI 스펙 추출
+    # import json
+    # openapi_schema = app.openapi()
+    # # 파일로 저장
+    # with open("openapi.json", "w") as f:
+    #     json.dump(openapi_schema, f, indent=2)
+    # print("openapi.json 파일이 생성되었습니다.")
