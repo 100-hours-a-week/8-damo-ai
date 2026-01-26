@@ -54,6 +54,7 @@ jobs:
         rm -f "${{ env.ARTIFACT_FILE }}"
         
         tar -czf "${{ env.ARTIFACT_FILE }}" \
+        ecosystem.ai.config.js \
         src \
         main.py \
         requirements.txt \
