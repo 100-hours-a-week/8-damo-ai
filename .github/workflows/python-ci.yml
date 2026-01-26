@@ -40,8 +40,15 @@ jobs:
         set -euo pipefail
 
         rm -f "${{ env.ARTIFACT_FILE }}"
-        git ls-files -z -- . ':!scripts/**' \
-        | tar --null -T - -czf "${{ env.ARTIFACT_FILE }}"
+        
+        tar -czf "${{ env.ARTIFACT_FILE }}" \
+        src \
+        main.py \
+        requirements.txt \
+        run.prod.sh \
+        run.dev.sh \
+        run.test.sh \
+        scripts
 
     - name: Upload bundle to server (SCP)
       if: github.event_name == 'push' && github.ref_name == 'main'
