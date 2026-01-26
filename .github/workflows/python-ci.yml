@@ -19,7 +19,7 @@ env:
   DEPLOY_SCRIPT: scripts/deploy_bigbang.sh
 
 jobs:
-  test:
+  ci:
     runs-on: ubuntu-latest
     
     steps:
@@ -88,7 +88,7 @@ jobs:
         overwrite: true
 
   deploy:
-    needs: test
+    needs: ci
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && (github.ref_name == 'dev' || github.ref_name == 'main') && needs.test.result == 'success'
 
@@ -135,7 +135,7 @@ jobs:
   notify:
     name: Notify Discord
     runs-on: ubuntu-latest
-    needs: [test, deploy]
+    needs: [ci, deploy]
     if: always()
 
     steps:
