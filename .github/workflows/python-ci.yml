@@ -89,7 +89,7 @@ jobs:
   deploy:
     needs: test
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.ci.result == 'success'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.test.result == 'success'
 
     steps:
       - name: Checkout Repository
