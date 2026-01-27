@@ -55,7 +55,7 @@ jobs:
 
   notify:
     name: Notify Discord
-    runs-on: ubuntu-test
+    runs-on: ubuntu-latest
     needs: [rollback]
     if: always()
 
