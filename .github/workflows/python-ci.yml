@@ -47,7 +47,7 @@ jobs:
         ./run.test.sh
     
     - name: Build tar.gz
-      if: github.event_name == 'push' && github.ref_name == 'main'
+      if: github.event_name == 'push' && (github.ref_name == 'dev' || github.ref_name == 'main')
       run: |
         set -euo pipefail
 
@@ -64,7 +64,7 @@ jobs:
         scripts
 
     - name: Upload bundle to server (SCP)
-      if: github.event_name == 'push' && github.ref_name == 'main'
+      if: github.event_name == 'push' && (github.ref_name == 'dev' || github.ref_name == 'main')
       uses: appleboy/scp-action@v0.1.7
       with:
         host: ${{ env.HOST }}
@@ -76,7 +76,7 @@ jobs:
         overwrite: true
 
     - name: Upload deploy script to remote dir (SCP)
-      if: github.event_name == 'push' && github.ref_name == 'main'
+      if: github.event_name == 'push' && (github.ref_name == 'dev' || github.ref_name == 'main')
       uses: appleboy/scp-action@v0.1.7
       with:
         host: ${{ env.HOST }}
@@ -90,7 +90,7 @@ jobs:
   deploy:
     needs: ci
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.test.result == 'success'
+    if: github.event_name == 'push' && (github.ref_name == 'dev' || github.ref_name == 'main') && needs.ci.result == 'success'
 
     steps:
       - name: Checkout Repository

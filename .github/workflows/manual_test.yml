@@ -1,0 +1,17 @@
+name: MANUAL TEST
+
+on:
+  workflow_dispatch:
+    inputs:
+      input_boolean:
+        description: 'This is a boolean input'
+        required: true
+        default: false
+        type: boolean
+
+jobs:
+  deploy-to-staging:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Print the input
+        run: echo "input_boolean=${{ inputs.input_boolean }}"
