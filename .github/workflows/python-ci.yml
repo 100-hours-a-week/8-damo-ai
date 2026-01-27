@@ -5,6 +5,7 @@ on:
     branches: [ main, dev ]
   pull_request:
     branches: [ main, dev ]
+    types: closed
 
 env:
   HOST: ${{ secrets.AI_PROD_SERVER_HOST }}
@@ -19,7 +20,7 @@ env:
   DEPLOY_SCRIPT: scripts/deploy_bigbang.sh
 
 jobs:
-  test:
+  ci:
     runs-on: ubuntu-latest
     
     steps:
@@ -88,7 +89,7 @@ jobs:
         overwrite: true
 
   deploy:
-    needs: test
+    needs: ci
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.test.result == 'success'
 
@@ -135,8 +136,12 @@ jobs:
   notify:
     name: Notify Discord
     runs-on: ubuntu-latest
-    needs: [test, deploy]
-    if: always()
+    needs: [ci, deploy]
+    if: >
+      github.event_name == 'pull_request' &&
+      github.event.action == 'closed' &&
+      github.event.pull_request.merged == true &&
+      (github.event.pull_request.base.ref == 'main' || github.event.pull_request.base.ref == 'dev')
 
     steps:
       - name: Send notification
