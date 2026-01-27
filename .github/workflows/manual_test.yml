@@ -14,4 +14,4 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Print the input
-        run: echo $
+        run: echo "input_boolean=${{ inputs.input_boolean }}"
