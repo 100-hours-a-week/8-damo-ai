@@ -4,7 +4,6 @@ on:
   push:
     branches: [ main, dev ]
   pull_request:
-    types: closed
     branches: [ main, dev ]
 
 env:
@@ -137,10 +136,7 @@ jobs:
     name: Notify Discord
     runs-on: ubuntu-latest
     needs: [ci, deploy]
-    if: github.event_name == 'pull_request' &&
-      github.event.action == 'closed' &&
-      github.event.pull_request.merged == true &&
-      (github.event.pull_request.base.ref == 'main' || github.event.pull_request.base.ref == 'dev')
+    if: always() && github.event_name == 'push' && (github.ref_name == 'main' || github.ref_name == 'dev')
 
     steps:
       - name: Send notification
