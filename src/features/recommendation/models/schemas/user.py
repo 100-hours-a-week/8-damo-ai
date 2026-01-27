@@ -35,9 +35,7 @@ class UserData(BaseModel):
 
 class ReviewData(BaseModel):
     """리뷰 데이터 모델"""
-
     model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
-
     restaurant_id: str = Field(..., description="식당 ID")
     user_id: int = Field(..., description="사용자 ID")
     rating: int = Field(..., description="평점")
