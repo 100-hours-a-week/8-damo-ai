@@ -33,7 +33,6 @@ jobs:
           host: ${{ secrets.AI_PROD_SERVER_HOST }}
           username: ${{ secrets.AI_PROD_SERVER_USER}}
           key: ${{ secrets.AI_PROD_SERVER_KEY }}
-          script_stop: true
           command_timeout: 10m
           script: |
             set -euo pipefail
