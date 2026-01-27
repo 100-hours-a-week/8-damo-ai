@@ -7,6 +7,18 @@ on:
     branches: [ main, dev ]
     types: closed
 
+env:
+  HOST: ${{ secrets.AI_PROD_SERVER_HOST }}
+  USER: ${{ secrets.AI_PROD_SERVER_USER }}
+  PORT: ${{ secrets.AI_PROD_SERVER_PORT }}
+  KEY: ${{ secrets.AI_PROD_SERVER_KEY }}
+
+  REMOTE_DIR: /home/ubuntu/opt/ai-prod
+  INCOMING_DIR: /home/ubuntu/opt/ai-prod/incoming
+
+  ARTIFACT_FILE: ai-app.tar.gz
+  DEPLOY_SCRIPT: scripts/deploy_bigbang.sh
+
 jobs:
   ci:
     runs-on: ubuntu-latest
@@ -41,8 +53,16 @@ jobs:
         set -euo pipefail
 
         rm -f "${{ env.ARTIFACT_FILE }}"
-        git ls-files -z -- . ':!scripts/**' \
-        | tar --null -T - -czf "${{ env.ARTIFACT_FILE }}"
+        
+        tar -czf "${{ env.ARTIFACT_FILE }}" \
+        ecosystem.ai.config.js \
+        src \
+        main.py \
+        requirements.txt \
+        run.prod.sh \
+        run.dev.sh \
+        run.test.sh \
+        scripts
 
     - name: Upload bundle to server (SCP)
       if: github.event_name == 'push' && github.ref_name == 'main'
@@ -71,7 +91,7 @@ jobs:
   deploy:
     needs: ci
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.ci.result == 'success'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.test.result == 'success'
 
     steps:
       - name: Checkout Repository
