@@ -39,7 +39,6 @@ def test_update_persona_db():
     # 응답도 camelCase로 오는지 확인
     assert data["success"] is True
     assert data["userId"] == 123456789
-    # processTime is removed from schema
 
 
 def test_health_check():
@@ -57,10 +56,15 @@ def test_recommendations():
             "groupsId": 10,
             "diningDate": "2024-02-01T19:00:00",
             "budget": 50000,
+            "x": "127.12345",  # Added required field
+            "y": "37.12345",  # Added required field
         },
         "userIds": [123456789],
     }
     response = client.post("/ai/api/v1/recommendations", json=payload)
+    if response.status_code != 200:
+        print(response.json())
+
     assert response.status_code == 200
     data = response.json()
     assert "recommendedItems" in data
@@ -71,7 +75,6 @@ def test_recommendations():
     # Pydantic 타입과 동일한지(필드 존재 여부) 검수
     first_item = data["recommendedItems"][0]
     assert "restaurantId" in first_item
-    # assert "restaurantName" in first_item  # Removed from schema
     assert "reasoningDescription" in first_item
 
 
@@ -83,14 +86,41 @@ def test_analyze_refresh():
             "groupsId": 10,
             "diningDate": "2024-02-01T19:00:00",
             "budget": 50000,
+            "x": "127.12345",  # Added required field
+            "y": "37.12345",  # Added required field
         },
         "userIds": [123456789],
         "voteResultList": [],
     }
 
     response = client.post("/ai/api/v1/analyze_refresh", json=payload)
+    if response.status_code != 200:
+        print(response.json())
+
     assert response.status_code == 200
     data = response.json()
     assert "recommendedItems" in data
     assert len(data["recommendedItems"]) > 0
-    # assert data["recommendedItems"][0]["restaurantName"] == "도치피자 고기리점"  # Removed from schema
+
+
+def test_restaurant_fix():
+    """최종 식당 확정 API 호출 테스트"""
+    payload = {
+        "diningData": {
+            "diningId": 1,
+            "groupsId": 10,
+            "diningDate": "2024-02-01T19:00:00",
+            "budget": 50000,
+            "x": "127.12345",
+            "y": "37.12345",
+        },
+        "restaurantId": "test-restaurant-id-123",
+        "voteResultList": [],
+    }
+
+    response = client.post("/ai/api/v1/restaurant_fix", json=payload)
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["success"] is True
+    assert data["restaurantId"] == "test-restaurant-id-123"
