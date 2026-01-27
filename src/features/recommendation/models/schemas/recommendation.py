@@ -20,6 +20,8 @@ class DiningData(BaseModel):
     groups_id: int = Field(..., description="그룹 테이블의 PK")
     dining_date: datetime = Field(..., description="회식 진행 날짜")
     budget: int = Field(..., description="회식 진행 예산")
+    x: float = Field(..., description="경도 (longitude)")
+    y: float = Field(..., description="위도 (latitude)")
 
 
 # RecommendedItem
