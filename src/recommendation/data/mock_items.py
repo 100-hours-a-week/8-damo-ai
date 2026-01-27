@@ -1,4 +1,6 @@
-from src.recommendation.schemas.requests.recommendation_request import RecommendedItem
+from src.recommendation.schemas.recommended_item import RecommendedItem
+from src.recommendation.schemas.recommendations_response import RecommendationsResponse
+from src.recommendation.schemas.analyze_refresh_response import AnalyzeRefreshResponse
 
 MOCK_DEV_ITEMS = [
     RecommendedItem(
@@ -22,3 +24,11 @@ MOCK_DEV_ITEMS = [
         reasoning_description="가족과 함께 즐길 수 있는 식당으로 추천되었습니다.",
     ),
 ]
+
+MOCK_RECOMMENDATIONS_RESPONSE = RecommendationsResponse(
+    recommendation_count=len(MOCK_DEV_ITEMS), recommended_items=MOCK_DEV_ITEMS
+)
+
+MOCK_ANALYZE_REFRESH_RESPONSE = AnalyzeRefreshResponse(
+    recommendation_count=len(MOCK_DEV_ITEMS), recommended_items=MOCK_DEV_ITEMS
+)
