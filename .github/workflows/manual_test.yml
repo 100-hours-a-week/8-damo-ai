@@ -19,7 +19,7 @@ on:
 
 env:
   REMOTE_DIR: /home/ubuntu/opt/ai-prod
-  ROLLBACK_SCRIPT: scripts/rollback.sh
+  ROLLBACK_SCRIPT: app/scripts/rollback.sh
 
 jobs:
   rollback:
