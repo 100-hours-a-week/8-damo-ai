@@ -39,12 +39,12 @@ async def test_save_and_find_persona():
     print(f"[Test] Successfully saved. Now retrieving...")
 
     # 조회 테스트
-    found_persona = await repository.find_by_nickname(test_nickname)
+    found_persona = await repository.find_by_user_id(99999)
 
     assert found_persona is not None
-    assert found_persona.nickname == test_nickname
     assert found_persona.id == 99999
+    assert found_persona.nickname == test_nickname
     assert found_persona.gender == Gender.MALE
     assert AllergyType.PEACH in found_persona.allergies
 
-    print(f"[Test] Successfully retrieved persona: {found_persona.nickname}")
+    print(f"[Test] Successfully retrieved persona: {found_persona.id}")
