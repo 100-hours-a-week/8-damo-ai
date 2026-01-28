@@ -26,9 +26,9 @@ MOCK_DEV_ITEMS = [
 ]
 
 MOCK_RECOMMENDATIONS_RESPONSE = RecommendationsResponse(
-    recommendation_count=len(MOCK_DEV_ITEMS), recommended_items=MOCK_DEV_ITEMS
+    recommendation_count=1, recommended_items=MOCK_DEV_ITEMS
 )
 
 MOCK_ANALYZE_REFRESH_RESPONSE = AnalyzeRefreshResponse(
-    recommendation_count=len(MOCK_DEV_ITEMS), recommended_items=MOCK_DEV_ITEMS
+    recommendation_count=1, recommended_items=MOCK_DEV_ITEMS
 )
