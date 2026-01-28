@@ -65,7 +65,7 @@ jobs:
         run.prod.sh \
         run.dev.sh \
         run.test.sh \
-        scripts
+        scripts \
         pyproject.toml
 
     - name: Upload bundle to server (SCP)
