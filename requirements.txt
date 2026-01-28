@@ -2,4 +2,4 @@ fastapi
 uvicorn[standard]
 langgraph
 google-generativeai
-langchain-google-gen-ai
+langchain-google-genai
