@@ -39,7 +39,7 @@ jobs:
 
             cd ${{ env.REMOTE_DIR }}
 
-            echo "== Frontend Rollback =="
+            echo "== AI Rollback =="
             echo "Reason: ${{ github.event.inputs.reason }}"
             echo "Rollback script: ${{ env.REMOTE_DIR }}/${{ env.ROLLBACK_SCRIPT }}"
             echo
