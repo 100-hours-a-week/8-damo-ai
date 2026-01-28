@@ -62,6 +62,7 @@ jobs:
         run.dev.sh \
         run.test.sh \
         scripts
+        pyproject.toml
 
     - name: Upload bundle to server (SCP)
       if: github.event_name == 'push' && (github.ref_name == 'dev' || github.ref_name == 'main')
