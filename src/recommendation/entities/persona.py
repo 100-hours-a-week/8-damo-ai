@@ -19,6 +19,7 @@ class PersonaDocument(BaseModel):
     like_food_categories_id: List[str]
     categories_id: List[str]
     other_characteristics: str
+    base_persona: str
 
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: datetime = Field(default_factory=datetime.now)
