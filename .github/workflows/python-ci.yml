@@ -114,13 +114,13 @@ jobs:
             # app/에 tar.gz 풀기
             tar -xzf "${ART}" -C "${APP_DIR}"
 
-            # app/ 아래에 scripts 생겨쓴ㄴ지 확인
-            SCRIPT="${APP_DIR}/scripts/deploy_bigbang.sh"
+            # app/ 아래에 scripts 생겼는지 확인
+            SCRIPT="${{ env.REMOTE_DIR }}/${{ env.DEPLOY_SCRIPT }}"
             echo "Script: ${SCRIPT}"
 
             if [ ! -f "${SCRIPT}" ]; then
               echo "ERROR: deploy script not found: ${SCRIPT}"
-              ls -al "${APP_DOR}" || true
+              ls -al "${APP_DIR}" || true
               echo "Listing scripts dir:"
               ls -al "${APP_DIR}/scripts" || true
               exit 1
