@@ -12,10 +12,21 @@ from main import app
 client = TestClient(app)
 
 
-def test_update_persona_db():
+from unittest.mock import AsyncMock, patch, MagicMock
+
+
+@patch("src.recommendation.router.routes_v1.persona_workflow")
+def test_update_persona_db(mock_workflow):
     """
     CI용 목업 테스트: Persona 업데이트 API 호출 테스트 (CamelCase JSON 통신)
     """
+    # Mock workflow response
+    mock_final_doc = MagicMock()
+    mock_final_doc.id = 123456789
+
+    # Mock return value of ainvoke
+    mock_workflow.ainvoke = AsyncMock(return_value={"final_document": mock_final_doc})
+
     # Spring 방식의 camelCase JSON 요청
     # UserDataRequest: user_data (single object), review_data (list)
     payload = {
