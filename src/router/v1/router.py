@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from src.recommendation.api import routes_v1 as recommendation_routes
+from src.recommendation.router import routes_v1 as recommendation_routes
 
 router = APIRouter()
 

@@ -14,6 +14,7 @@ from src.recommendation.data.mock_items import (
     MOCK_RECOMMENDATIONS_RESPONSE,
     MOCK_ANALYZE_REFRESH_RESPONSE,
 )
+from src.recommendation.features.persona_manager.workflows.graph import persona_workflow
 
 router = APIRouter()
 
@@ -33,9 +34,24 @@ async def update_persona_db(request: UpdatePersonaDBRequest):
             content={"success": False, "message": "data is empty or is not exists"},
         )
 
-    target_user_id = request.user_data.id
+    # LangGraph 워크플로우 실행
+    try:
+        result = await persona_workflow.ainvoke({"request_data": request})
+        final_doc = result.get("final_document")
 
-    return UpdatePersonaDBResponse(success=True, user_id=target_user_id)
+        if not final_doc:
+            return JSONResponse(
+                status_code=500,
+                content={"success": False, "message": "Failed to generate persona"},
+            )
+
+        return UpdatePersonaDBResponse(success=True, user_id=final_doc.id)
+
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={"success": False, "message": str(e)},
+        )
 
 
 @router.post(
