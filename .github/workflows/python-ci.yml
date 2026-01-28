@@ -56,17 +56,30 @@ jobs:
         set -euo pipefail
 
         rm -f "${{ env.ARTIFACT_FILE }}"
-        
+        rm -f .env
+
+        # .env 생성
+        umask 077
+        cat > .env <<EOF
+        GOOGLE_API_KEY=${{ secrets.GOOGLE_API_KEY }}
+        MONGODB_URI=${{ secrets.MONGODB_URI }}
+        DB_NAME=${{ secrets.DB_NAME }}
+        EOF
+
         tar -czf "${{ env.ARTIFACT_FILE }}" \
-        ecosystem.ai.config.js \
-        src \
-        main.py \
-        requirements.txt \
-        run.prod.sh \
-        run.dev.sh \
-        run.test.sh \
-        scripts \
-        pyproject.toml
+          .env \
+          ecosystem.ai.config.js \
+          src \
+          main.py \
+          requirements.txt \
+          run.prod.sh \
+          run.dev.sh \
+          run.test.sh \
+          scripts \
+          pyproject.toml
+
+        rm -f .env
+
 
     - name: Upload bundle to server (SCP)
       if: github.event_name == 'push' && (github.ref_name == 'dev' || github.ref_name == 'main')
