@@ -96,7 +96,7 @@ jobs:
             set -euo pipefail
 
             mkdir -p "${{ env.INCOMING_DIR }}"
-            mkdir -p "${{ env.REMOTE_DIR }}/a]]"
+            mkdir -p "${{ env.REMOTE_DIR }}/app"
 
             ART="${{ env.INCOMING_DIR }}/${{ env.ARTIFACT_FILE }}"
             APP_DIR="${{ env.REMOTE_DIR }}/app"
