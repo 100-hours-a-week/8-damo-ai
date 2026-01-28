@@ -17,7 +17,7 @@ async def health_check():
     return {"status": "ok", "message": "Server is healthy"}
 
 
-app.include_router(router, prefix="/ai/api")
+app.include_router(api_router, prefix="/ai/api")
 
 
 if __name__ == "__main__":

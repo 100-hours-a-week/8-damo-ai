@@ -91,7 +91,8 @@ async def test_generate_base_persona_node(mock_request_data):
 
             assert passed_input["nickname"] == "test_user"
             assert passed_input["age_group"] == AgeGroup.TWENTIES
-            assert passed_input["categories_id"] == "KOREAN"
+            assert passed_input["preferred_ingredients"] == "KOREAN"
+            assert passed_input["like_food_categories"] == "KOREAN"
 
 
 @pytest.mark.asyncio
