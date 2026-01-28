@@ -59,7 +59,7 @@ def test_recommendations():
             "x": "127.12345",  # Added required field
             "y": "37.12345",  # Added required field
         },
-        "userIds": [123456789],
+        "userIds": ["123456789"],
     }
     response = client.post("/ai/api/v1/recommendations", json=payload)
     if response.status_code != 200:

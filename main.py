@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 import uvicorn
-from src.api.router import api_router
+from src.router.router import router
 
 app = FastAPI(title="Damo AI Pipeline API", version="0.0.1")
 
@@ -17,7 +17,7 @@ async def health_check():
     return {"status": "ok", "message": "Server is healthy"}
 
 
-app.include_router(api_router, prefix="/ai/api")
+app.include_router(router, prefix="/ai/api")
 
 
 if __name__ == "__main__":
