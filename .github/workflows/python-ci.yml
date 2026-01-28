@@ -59,13 +59,14 @@ jobs:
         rm -f .env
 
         # .env 생성
-        umask 077
+        install -m 600 /dev/null .env
         cat > .env <<EOF
         GOOGLE_API_KEY=${{ secrets.GOOGLE_API_KEY }}
         MONGODB_URI=${{ secrets.MONGODB_URI }}
         DB_NAME=${{ secrets.DB_NAME }}
         EOF
 
+        umask 022
         tar -czf "${{ env.ARTIFACT_FILE }}" \
           .env \
           ecosystem.ai.config.js \
@@ -78,6 +79,7 @@ jobs:
           scripts \
           pyproject.toml
 
+        chmod 644 ai-app.tar.gz
         rm -f .env
 
 
