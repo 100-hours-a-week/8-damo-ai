@@ -40,9 +40,9 @@ async def generate_base_persona_node(state: PersonaState) -> PersonaState:
             "gender": user.gender,
             "age_group": user.age_group,
             "allergies": ", ".join([a.value for a in user.allergies]),
-            "like_categories": ", ".join(user.like_food_categories_id),
-            "categories_id": ", ".join(user.categories_id),
-            "other": user.other_characteristics,
+            "like_food_categories": ", ".join(user.like_food_categories_id),
+            "preferred_ingredients": ", ".join(user.categories_id),
+            "other_characteristics": user.other_characteristics,
             "reviews": reviews_text,
         }
     )
