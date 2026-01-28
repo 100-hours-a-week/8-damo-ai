@@ -3,3 +3,4 @@ uvicorn[standard]
 langgraph
 google-generativeai
 langchain-google-genai
+pydantic
