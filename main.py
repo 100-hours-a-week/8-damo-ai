@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 import uvicorn
-from src.api.router import api_router
+from src.router.router import api_router
 
 app = FastAPI(title="Damo AI Pipeline API", version="0.0.1")
 
