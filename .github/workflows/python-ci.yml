@@ -18,6 +18,10 @@ env:
   ARTIFACT_FILE: ai-app.tar.gz
   DEPLOY_SCRIPT: app/scripts/deploy_bigbang.sh
 
+  GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }} 
+  MONGODB_URI: ${{ secrets.MONGODB_URI }}
+  DB_NAME: ${{ secrets.DB_NAME }}
+
 jobs:
   ci:
     runs-on: ubuntu-latest
