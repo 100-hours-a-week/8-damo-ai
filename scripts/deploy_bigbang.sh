@@ -97,11 +97,12 @@ fi
 echo "3-3) venv 생성 및 의존성 설치..."
 cd "$DEPLOY_DIR"
 
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -U pip
-pip install -r requirements.txt
-deactivate
+# python3 -m venv .venv
+# source .venv/bin/activate
+# pip install -U pip
+# pip install -r requirements.txt
+# deactivate
+poetry install
 
 # 4) PM2 재기동 
 echo "4) PM2로 재기동..."
