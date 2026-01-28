@@ -6,6 +6,7 @@ def get_llm(temperature: float = 0.7) -> ChatGoogleGenerativeAI:
     """
     Gemini LLM 인스턴스를 반환합니다.
     """
+
     return ChatGoogleGenerativeAI(
         model=settings.GEMINI_MODEL,
         temperature=temperature,
