@@ -8,7 +8,7 @@ from src.recommendation.enums import AllergyType, Gender, AgeGroup
 class PersonaDocument(BaseModel):
     """MongoDB 'users' 컬렉션 문서 모델"""
 
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(populate_by_name=True, alias_generator=to_camel)
 
     # id: int  # Snowflake ID를 _id로 쓸지, 별도 필드로 쓸지에 따라 결정
     id: int
