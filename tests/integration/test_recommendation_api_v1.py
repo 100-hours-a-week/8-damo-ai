@@ -125,7 +125,7 @@ def test_restaurant_fix():
             "x": "127.12345",
             "y": "37.12345",
         },
-        "restaurantId": "test-restaurant-id-123",
+        "restaurantId": "6976b54010e1fa815903d4ce",
         "voteResultList": [],
     }
 
@@ -134,4 +134,4 @@ def test_restaurant_fix():
     assert response.status_code == 200
     data = response.json()
     assert data["success"] is True
-    assert data["restaurantId"] == "test-restaurant-id-123"
+    assert data["restaurantId"] == "6976b54010e1fa815903d4ce"
