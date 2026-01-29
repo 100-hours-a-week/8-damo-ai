@@ -1,5 +1,6 @@
 import sys
 import os
+import random
 
 # 프로젝트 루트 디렉토리를 sys.path에 추가하여 main을 찾을 수 있게 합니다.
 sys.path.append(
@@ -61,9 +62,10 @@ def test_health_check():
 
 def test_recommendations():
     """식당 추천 API 호출 테스트 (CamelCase JSON 통신)"""
+    test_dining_id = random.randint(1, 1000000) 
     payload = {
         "diningData": {
-            "diningId": 1,
+            "diningId": test_dining_id,
             "groupsId": 10,
             "diningDate": "2024-02-01T19:00:00",
             "budget": 50000,
@@ -91,9 +93,10 @@ def test_recommendations():
 
 def test_analyze_refresh():
     """재추천 API 호출 테스트 (CamelCase JSON 통신)"""
-    payload = {
+    test_dining_id = random.randint(1, 1000000) 
+    setup_payload = {
         "diningData": {
-            "diningId": 1,
+            "diningId": test_dining_id,
             "groupsId": 10,
             "diningDate": "2024-02-01T19:00:00",
             "budget": 50000,
@@ -103,7 +106,20 @@ def test_analyze_refresh():
         "userIds": [123456789],
         "voteResultList": [],
     }
+    client.post("/ai/api/v1/recommendations", json=setup_payload)
 
+    payload = {
+        "diningData": {
+            "diningId": test_dining_id,
+            "groupsId": 10,
+            "diningDate": "2024-02-01T19:00:00",
+            "budget": 50000,
+            "x": "127.12345",  # Added required field
+            "y": "37.12345",  # Added required field
+        },
+        "userIds": [123456789],
+        "voteResultList": [],
+    }
     response = client.post("/ai/api/v1/analyze_refresh", json=payload)
     if response.status_code != 200:
         print(response.json())
@@ -116,19 +132,27 @@ def test_analyze_refresh():
 
 def test_restaurant_fix():
     """최종 식당 확정 API 호출 테스트"""
-    payload = {
+    test_id = random.randint(1, 1000000) # 고유 ID 생성
+
+    # 1. 사전 세션 생성 (Setup)
+    setup_payload = {
         "diningData": {
-            "diningId": 1,
+            "diningId": test_id,
             "groupsId": 10,
             "diningDate": "2024-02-01T19:00:00",
             "budget": 50000,
-            "x": "127.12345",
-            "y": "37.12345",
+            "x": "127.12345", "y": "37.12345",
         },
+        "userIds": [123456789],
+    }
+    client.post("/ai/api/v1/recommendations", json=setup_payload)
+    
+    # 2. 결과 확정 요청
+    payload = {
+        "diningData": setup_payload["diningData"],
         "restaurantId": "6976b54010e1fa815903d4ce",
         "voteResultList": [],
     }
-
     response = client.post("/ai/api/v1/restaurant_fix", json=payload)
 
     assert response.status_code == 200
