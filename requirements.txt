@@ -1,8 +1,11 @@
 fastapi
 uvicorn[standard]
 langgraph
+langchain
 google-generativeai
 langchain-google-genai
+langchain-openai
+langfuse
 pydantic>=2.0
 pydantic-settings
 motor
