@@ -13,4 +13,4 @@ class RecommendationsRequest(BaseModel):
     model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
     dining_data: DiningData = Field(..., description="회식 데이터")
-    user_ids: List[str] = Field(..., description="추천할 사용자 id 리스트")
+    user_ids: List[int] = Field(..., description="추천할 사용자 id 리스트")
