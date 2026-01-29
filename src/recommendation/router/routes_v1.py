@@ -14,11 +14,18 @@ from src.recommendation.data.mock_items import (
     MOCK_RECOMMENDATIONS_RESPONSE,
     MOCK_ANALYZE_REFRESH_RESPONSE,
 )
-from src.recommendation.features.persona_manager.workflows.graph import persona_workflow
-from src.shared.database import create_dining_session, update_current_phase, finalize_dining_session
+from src.recommendation.features.persona_manager.services.persona_service import (
+    PersonaService,
+)
+from src.shared.database import (
+    create_dining_session,
+    update_current_phase,
+    finalize_dining_session,
+)
 
 
 router = APIRouter()
+
 
 @router.post(
     "/update_persona_db",
@@ -35,16 +42,10 @@ async def update_persona_db(request: UpdatePersonaDBRequest):
             content={"success": False, "message": "data is empty or is not exists"},
         )
 
-    # LangGraph 워크플로우 실행
+    # PersonaService를 사용하여 페르소나 생성 및 저장
     try:
-        result = await persona_workflow.ainvoke({"request_data": request})
-        final_doc = result.get("final_document")
-
-        if not final_doc:
-            return JSONResponse(
-                status_code=500,
-                content={"success": False, "message": "Failed to generate persona"},
-            )
+        persona_service = PersonaService()
+        final_doc = await persona_service.create_and_save_persona(request)
 
         return UpdatePersonaDBResponse(success=True, user_id=final_doc.id)
 
@@ -81,7 +82,10 @@ async def recommendations(request: RecommendationsRequest):
     if session_id is None:
         return JSONResponse(
             status_code=400,
-            content={"success": False, "message": "Dining session is already completed."}
+            content={
+                "success": False,
+                "message": "Dining session is already completed.",
+            },
         )
     return MOCK_RECOMMENDATIONS_RESPONSE
 
@@ -107,7 +111,10 @@ async def analyze_refresh(request: AnalyzeRefreshRequest):
     if result is None:
         return JSONResponse(
             status_code=400,
-            content={"success": False, "message": "Dining session not found or already completed."}
+            content={
+                "success": False,
+                "message": "Dining session not found or already completed.",
+            },
         )
     return result
 
@@ -128,17 +135,19 @@ async def restaurant_fix(request: RestaurantFixRequest):
             status_code=400,
             content={"success": False, "message": "restaurant_id is required"},
         )
-    
+
     result = await finalize_dining_session(
-        request.dining_data.dining_id, 
-        request.restaurant_id
+        request.dining_data.dining_id, request.restaurant_id
     )
-    
+
     if not result.success:
-        message = "Session not found" if result.restaurant_id == "" else "Selected restaurant is not in candidates"
-        return JSONResponse(
-            status_code=400,
-            content={"success": False, "message": message}
+        message = (
+            "Session not found"
+            if result.restaurant_id == ""
+            else "Selected restaurant is not in candidates"
         )
-    
+        return JSONResponse(
+            status_code=400, content={"success": False, "message": message}
+        )
+
     return result

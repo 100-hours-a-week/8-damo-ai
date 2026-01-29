@@ -16,17 +16,23 @@ client = TestClient(app)
 from unittest.mock import AsyncMock, patch, MagicMock
 
 
-@patch("src.recommendation.router.routes_v1.persona_workflow")
-def test_update_persona_db(mock_workflow):
+@patch("src.recommendation.router.routes_v1.PersonaService")
+def test_update_persona_db(mock_service_class):
     """
     CI용 목업 테스트: Persona 업데이트 API 호출 테스트 (CamelCase JSON 통신)
     """
-    # Mock workflow response
+    # Mock PersonaService instance
+    mock_service_instance = MagicMock()
+    mock_service_class.return_value = mock_service_instance
+
+    # Mock final document
     mock_final_doc = MagicMock()
     mock_final_doc.id = 123456789
 
-    # Mock return value of ainvoke
-    mock_workflow.ainvoke = AsyncMock(return_value={"final_document": mock_final_doc})
+    # Mock create_and_save_persona method
+    mock_service_instance.create_and_save_persona = AsyncMock(
+        return_value=mock_final_doc
+    )
 
     # Spring 방식의 camelCase JSON 요청
     # UserDataRequest: user_data (single object), review_data (list)
@@ -62,7 +68,7 @@ def test_health_check():
 
 def test_recommendations():
     """식당 추천 API 호출 테스트 (CamelCase JSON 통신)"""
-    test_dining_id = random.randint(1, 1000000) 
+    test_dining_id = random.randint(1, 1000000)
     payload = {
         "diningData": {
             "diningId": test_dining_id,
@@ -93,7 +99,7 @@ def test_recommendations():
 
 def test_analyze_refresh():
     """재추천 API 호출 테스트 (CamelCase JSON 통신)"""
-    test_dining_id = random.randint(1, 1000000) 
+    test_dining_id = random.randint(1, 1000000)
     setup_payload = {
         "diningData": {
             "diningId": test_dining_id,
@@ -132,7 +138,7 @@ def test_analyze_refresh():
 
 def test_restaurant_fix():
     """최종 식당 확정 API 호출 테스트"""
-    test_id = random.randint(1, 1000000) # 고유 ID 생성
+    test_id = random.randint(1, 1000000)  # 고유 ID 생성
 
     # 1. 사전 세션 생성 (Setup)
     setup_payload = {
@@ -141,12 +147,13 @@ def test_restaurant_fix():
             "groupsId": 10,
             "diningDate": "2024-02-01T19:00:00",
             "budget": 50000,
-            "x": "127.12345", "y": "37.12345",
+            "x": "127.12345",
+            "y": "37.12345",
         },
         "userIds": [123456789],
     }
     client.post("/ai/api/v1/recommendations", json=setup_payload)
-    
+
     # 2. 결과 확정 요청
     payload = {
         "diningData": setup_payload["diningData"],
