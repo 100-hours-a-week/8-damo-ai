@@ -1,0 +1,64 @@
+{
+    "sample_schema": {
+        "_id": "자동생성",
+        "diningId": "회식 아이디",
+        "groupsId": "그룹 아이디",
+        "diningDate": "회식 날짜",
+        "budget": "회식 예산",
+        "x": "경도",
+        "y": "위도",
+        "currentPhase": 2,
+        "isCompleted": false,
+        "phases": [
+            {
+                "round": 1,
+                "refreshReason": "",
+                "userPersona": [
+                    {
+                        "userId": "사용자 페르소나 아이디",
+                        "basePersona": "기본 페르소나 특징",
+                        "현재 페르소나의 식당에 대한 의견": "새로운 페르소나 특징",
+                        "currentLLMVotes": {
+                            "likes": [
+                                "선호 식당 아이디"
+                            ],
+                            "dislikes": [
+                                "비선호 식당 아이디"
+                            ]
+                        },
+                        "nextHumanVotes": {
+                            "likes": [
+                                "선호 식당 아이디"
+                            ],
+                            "dislikes": [
+                                "비선호 식당 아이디"
+                            ]
+                        }
+                    }
+                ],
+                "servedRestaurants": [
+                    {
+                        "restaurantId": "식당 아이디",
+                        "filteredScore": 0.0
+                    }
+                ],
+                "createdAt": "phase 생성 시간"
+            }
+        ],
+        "restaurantCandidate": [
+            {
+                "restaurantId": "",
+                "filteredScore": 0.0
+            }
+        ],
+        "finalRestaurant": []
+    }
+}
+// 플로우
+// 1. 위의 document는 discussion이 끝난 이후에 생성 혹은 업데이트 됩니다.
+// 2. 위의 document read 시점은 각 AI 모델이 분석을 하기 위해 호출합니다.
+// 3. 최초 생성 및 업데이트 시에는 "currentLLMVotes"만 업데이트 되고 "nextHumanVotes"는 비어있습니다.
+// 4. round 가 거듭될때마다 "현재 페르소나의 식당에 대한 의견", "nextHumanVotes"가 업데이트 됩니다.
+// 5. round 가 재생성(1보다 클때)될때마다 이전 round의 "nextHumanVotes" 업데이트 합니다.
+// 6. 현재 round에서 discussion을 위해 이전 round의 데이터(currentLLMVotes, nextHumanVotes, 현재 페르소나의 식당에 대한 의견)를 가져와서 새로운 투표 결과와 의견을 만듭니다.
+// 7. 항상 결과를 반환할때는 nextHumanVotes는 비어있고, 마지막 round에서 투표가 성립되었을때 이전 단계 round의 "nextHumanVotes"가 업데이트 됩니다.

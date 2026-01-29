@@ -1,0 +1,170 @@
+name: AI Pipeline CI
+
+on:
+  push:
+    branches: [ main, dev ]
+  pull_request:
+    branches: [ main, dev ]
+
+env:
+  HOST: ${{ secrets.AI_PROD_SERVER_HOST }}
+  USER: ${{ secrets.AI_PROD_SERVER_USER }}
+  PORT: ${{ secrets.AI_PROD_SERVER_PORT }}
+  KEY: ${{ secrets.AI_PROD_SERVER_KEY }}
+
+  REMOTE_DIR: /home/ubuntu/opt/ai-prod
+  INCOMING_DIR: /home/ubuntu/opt/ai-prod/incoming
+
+  ARTIFACT_FILE: ai-app.tar.gz
+  DEPLOY_SCRIPT: app/scripts/deploy_bigbang.sh
+
+  GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }} 
+  MONGODB_URI: ${{ secrets.MONGODB_URI }}
+  DB_NAME: ${{ secrets.DB_NAME }}
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python 3.12
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12.3'
+
+    - name: Install Poetry
+      run: |
+        curl -sSL https://install.python-poetry.org | python3 -
+        echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+    - name: Install dependencies
+      run: |
+        poetry install
+
+    - name: Run Integration Tests
+      run: |
+        # run.test.sh를 활용하거나 직접 pytest 실행
+        chmod +x run.test.sh 
+        ./run.test.sh
+    
+    - name: Build tar.gz
+      if: github.event_name == 'push' && (github.ref_name == 'dev' || github.ref_name == 'main')
+      run: |
+        set -euo pipefail
+
+        rm -f "${{ env.ARTIFACT_FILE }}"
+        rm -f .env
+
+        # .env 생성
+        install -m 600 /dev/null .env
+        cat > .env <<EOF
+        GOOGLE_API_KEY=${{ secrets.GOOGLE_API_KEY }}
+        MONGODB_URI=${{ secrets.MONGODB_URI }}
+        DB_NAME=${{ secrets.DB_NAME }}
+        EOF
+
+        umask 022
+        tar -czf "${{ env.ARTIFACT_FILE }}" \
+          .env \
+          ecosystem.ai.config.js \
+          src \
+          main.py \
+          requirements.txt \
+          run.prod.sh \
+          run.dev.sh \
+          run.test.sh \
+          scripts \
+          pyproject.toml
+
+        chmod 644 ai-app.tar.gz
+        rm -f .env
+
+
+    - name: Upload bundle to server (SCP)
+      if: github.event_name == 'push' && (github.ref_name == 'dev' || github.ref_name == 'main')
+      uses: appleboy/scp-action@v0.1.7
+      with:
+        host: ${{ env.HOST }}
+        username: ${{ env.USER }}
+        port: ${{ env.PORT }}
+        key: ${{ env.KEY }}
+        source: ${{ env.ARTIFACT_FILE }}
+        target: ${{ env.INCOMING_DIR }}/
+        overwrite: true
+
+  deploy:
+    needs: ci
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && (github.ref_name == 'dev' || github.ref_name == 'main') && needs.ci.result == 'success'
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Deploy via SSH (run deploy_bigbang.sh)
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ env.HOST }}
+          username: ${{ env.USER }}
+          port: ${{ env.PORT }}
+          key: ${{ env.KEY }}
+          script_stop: true
+          script: |
+            set -euo pipefail
+
+            mkdir -p "${{ env.INCOMING_DIR }}"
+            mkdir -p "${{ env.REMOTE_DIR }}/app"
+
+            ART="${{ env.INCOMING_DIR }}/${{ env.ARTIFACT_FILE }}"
+            APP_DIR="${{ env.REMOTE_DIR }}/app"
+
+            echo "Artifact: ${ART}"
+            echo "App dir: ${APP_DIR}"
+
+            # 파일 존재 확인(원인 바로 보이게)
+            if [ ! -f "${ART}" ]; then
+              echo "ERROR: artifact not found: ${ART}"
+              ls -al "${{ env.INCOMING_DIR }}" || true
+              exit 1
+            fi
+
+            # app/에 tar.gz 풀기
+            tar -xzf "${ART}" -C "${APP_DIR}"
+
+            # app/ 아래에 scripts 생겼는지 확인
+            SCRIPT="${{ env.REMOTE_DIR }}/${{ env.DEPLOY_SCRIPT }}"
+            echo "Script: ${SCRIPT}"
+
+            if [ ! -f "${SCRIPT}" ]; then
+              echo "ERROR: deploy script not found: ${SCRIPT}"
+              ls -al "${APP_DIR}" || true
+              echo "Listing scripts dir:"
+              ls -al "${APP_DIR}/scripts" || true
+              exit 1
+            fi
+
+            chmod +x "${SCRIPT}"
+            "${SCRIPT}" "${ART}"
+
+
+  notify:
+    name: Notify Discord
+    runs-on: ubuntu-latest
+    needs: [ci, deploy]
+    if: always() && github.event_name == 'push' && (github.ref_name == 'main' || github.ref_name == 'dev')
+
+    steps:
+      - name: Send notification
+        run: |
+          CI_RESULT="${{ needs.ci.result }}"
+          DEPLOY_RESULT="${{ needs.deploy.result }}"
+          REF="${{ github.repository }}@${{ github.ref_name }}"
+          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+          curl -H "Content-Type: application/json" \
+                -X POST \
+              -d "{\"username\":\"AI CI/CD\",\"content\":\"🖥️ AI CI/CD 결과\\n- CI: **${CI_RESULT}**\\n- Deploy: **${DEPLOY_RESULT}**\\n🔗 [${REF}](${RUN_URL})\"}" \
+              ${{ secrets.DISCORD_WEBHOOK_URL }}

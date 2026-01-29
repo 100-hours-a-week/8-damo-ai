@@ -1,0 +1,32 @@
+[tool.poetry]
+name = "ai-pipeline"
+version = "0.1.0"
+description = ""
+authors = ["jerry", "hayden"]
+package-mode = false
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "3.12.3"
+fastapi = "^0.128.0"
+uvicorn = { extras = ["standard"], version = "^0.40.0" }
+langgraph = "^1.0.6"
+langfuse = "^3.12.0"
+pytest = "^9.0.2"
+httpx = "^0.28.1"
+pydantic = "^2.12.5"
+pydantic-settings = "^2.12.0"
+motor = "^3.7.1"
+dnspython = "^2.8.0"
+langchain-google-genai = "^4.2.0"
+python-dotenv = "^1.2.1"
+google-generativeai = "^0.8.6"
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[dependency-groups]
+dev = [
+    "pytest-asyncio (>=1.3.0,<2.0.0)"
+]
