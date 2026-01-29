@@ -15,9 +15,10 @@ from src.recommendation.data.mock_items import (
     MOCK_ANALYZE_REFRESH_RESPONSE,
 )
 from src.recommendation.features.persona_manager.workflows.graph import persona_workflow
+from src.shared.database import create_dining_session, update_current_phase, finalize_dining_session
+
 
 router = APIRouter()
-
 
 @router.post(
     "/update_persona_db",
@@ -75,6 +76,13 @@ async def recommendations(request: RecommendationsRequest):
             content={"success": False, "message": "user_ids is empty"},
         )
 
+    # 세션 구현 부분
+    session_id = await create_dining_session(request)
+    if session_id is None:
+        return JSONResponse(
+            status_code=400,
+            content={"success": False, "message": "Dining session is already completed."}
+        )
     return MOCK_RECOMMENDATIONS_RESPONSE
 
 
@@ -95,7 +103,13 @@ async def analyze_refresh(request: AnalyzeRefreshRequest):
 
     # analyze_refresh는 재추천이므로 is_refresh=True로 가정.
     # refresh_count나 투표 결과 처리는 graph 내부 로직에 위임.
-    return MOCK_ANALYZE_REFRESH_RESPONSE
+    result = await update_current_phase(request.dining_data.dining_id)
+    if result is None:
+        return JSONResponse(
+            status_code=400,
+            content={"success": False, "message": "Dining session not found or already completed."}
+        )
+    return result
 
 
 @router.post(
@@ -114,10 +128,17 @@ async def restaurant_fix(request: RestaurantFixRequest):
             status_code=400,
             content={"success": False, "message": "restaurant_id is required"},
         )
-
-    # TODO: 실제 확정 로직 구현 (DB 업데이트 등)
-
-    return RestaurantFixResponse(
-        success=True,
-        restaurant_id=request.restaurant_id,
+    
+    result = await finalize_dining_session(
+        request.dining_data.dining_id, 
+        request.restaurant_id
     )
+    
+    if not result.success:
+        message = "Session not found" if result.restaurant_id == "" else "Selected restaurant is not in candidates"
+        return JSONResponse(
+            status_code=400,
+            content={"success": False, "message": message}
+        )
+    
+    return result
