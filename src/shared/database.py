@@ -9,6 +9,7 @@ from src.recommendation.schemas.analyze_refresh_response import AnalyzeRefreshRe
 from src.recommendation.schemas.restaurant_fix_response import RestaurantFixResponse
 from src.recommendation.schemas.recommended_item import RecommendedItem
 from src.recommendation.data.mock_items import MOCK_DEV_ITEMS
+import asyncio
 
 class Database:
     client: AsyncIOMotorClient = None
@@ -16,10 +17,19 @@ class Database:
 db_wrapper = Database()
 
 def get_client() -> AsyncIOMotorClient:
-    """MongoDB Client 싱글톤 반환"""
+    """MongoDB Client 싱글톤 반환 (이벤트 루프 변화 대응)"""
+    try:
+        current_loop = asyncio.get_running_loop()
+    except RuntimeError:
+        current_loop = None
+    # 클라이언트가 없거나, 기존 클라이언트의 루프와 현재 루프가 다를 경우 새로 생성
     if db_wrapper.client is None:
-        # 이벤트 루프 이슈 방지를 위해 여기서 생성하거나, lifespan에서 생성 권장
         db_wrapper.client = AsyncIOMotorClient(settings.MONGODB_URI)
+    elif current_loop and db_wrapper.client.get_io_loop() != current_loop:
+        # 기존 클라이언트의 소켓 등을 닫고 새로 생성
+        db_wrapper.client.close()
+        db_wrapper.client = AsyncIOMotorClient(settings.MONGODB_URI)
+        
     return db_wrapper.client
 
 def get_db() -> AsyncIOMotorDatabase:
