@@ -1,15 +1,26 @@
+from langgraph.graph import StateGraph, START, END
+from datetime import datetime
 from src.recommendation.workflows.states.recommendation_state import RecommendationState
+# 서브 노드
+from src.recommendation.features.restaurant_filtering.nodes.distance_node import distance_node
+from src.recommendation.features.restaurant_filtering.nodes.allergy_node import allergy_node
+from src.recommendation.features.restaurant_filtering.nodes.budget_node import budget_node
 
+# 에러 처리 노드
+def __error_handler_node(state: RecommendationState) -> str:
+    if state.get("is_error"):
+        return "error"
+    return "next"
 
-def restaurant_filtering_node(state: RecommendationState) -> dict:
-    """레스토랑 필터링 노드"""
-    # Mock Implementation
-    filtered = [
-        {"id": "6976b54010e1fa815903d4ce", "name": "Mock Restaurant 1"},
-        {"id": "6976b57f10e1fa815903d4cf", "name": "Mock Restaurant 2"},
-    ]
-    return {
-        "filtered_restaurants": filtered,
-        "status_message": ["Restaurant filtering completed"],
-        "process_time": 2.0,
-    }
+# 1. 서브 그래프 조립
+sub_builder = StateGraph(RecommendationState)
+sub_builder.add_node("distance", distance_node)
+sub_builder.add_node("allergy", allergy_node)
+sub_builder.add_node("budget", budget_node)
+# 2. 서브 그래프 연결
+sub_builder.add_edge(START, "distance")
+sub_builder.add_conditional_edges("distance", __error_handler_node, {"error": END, "next": "allergy"})
+sub_builder.add_conditional_edges("allergy", __error_handler_node, {"error": END, "next": "budget"})
+sub_builder.add_edge("budget", END)
+# 3. 컴파일
+restaurant_filtering_node = sub_builder.compile()

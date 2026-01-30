@@ -5,7 +5,6 @@ from bson import ObjectId
 from typing import Optional, Union
 from src.recommendation.schemas.recommendations_request import RecommendationsRequest
 from src.recommendation.schemas.recommendations_response import RecommendationsResponse
-from src.recommendation.schemas.analyze_refresh_response import AnalyzeRefreshResponse
 from src.recommendation.schemas.restaurant_fix_response import RestaurantFixResponse
 from src.recommendation.schemas.recommended_item import RecommendedItem
 from src.recommendation.data.mock_items import MOCK_DEV_ITEMS
@@ -40,8 +39,8 @@ def get_db() -> AsyncIOMotorDatabase:
 # 샘플 코드
 # 백엔드에서 흐름 테스트용도로 사용
 # 추후 실제 동작 코드로 교체 예정
-def to_analyze_refresh_response(data: Union[DiningSession, dict]) -> AnalyzeRefreshResponse:
-    """DiningSession 객체 또는 MongoDB dict를 AnalyzeRefreshResponse로 변환"""
+def to_recommendations_response(data: Union[DiningSession, dict]) -> RecommendationsResponse:
+    """DiningSession 객체 또는 MongoDB dict를 RecommendationsResponse로 변환"""
     session = DiningSession.model_validate(data) if isinstance(data, dict) else data
     
     # 1. 항목 리스트 생성
@@ -54,7 +53,7 @@ def to_analyze_refresh_response(data: Union[DiningSession, dict]) -> AnalyzeRefr
     ]
     
     # 2. 스키마에 정의된 정확한 필드명(recommended_items) 사용
-    return AnalyzeRefreshResponse(
+    return RecommendationsResponse(
         recommendation_count=session.current_phase,
         recommended_items=items  # restaurant_candidates -> recommended_items로 변경
     )
@@ -119,7 +118,7 @@ async def get_session_by_dining_id(dining_id: str) -> Optional[DiningSession]:
         return DiningSession.model_validate(doc)
     return None
 
-async def update_current_phase(dining_id: str) -> Optional[AnalyzeRefreshResponse]:
+async def update_current_phase(dining_id: str) -> Optional[RecommendationsResponse]:
     """currentPhase를 1 증가시키고 결과 반환"""
     db = get_db()
     collection = db["dining_sessions"]
