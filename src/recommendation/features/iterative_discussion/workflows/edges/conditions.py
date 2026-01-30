@@ -23,8 +23,8 @@ def check_consensus(
     max_rounds = state.get("max_rounds", 3)
     messages = state.get("messages", [])
 
-    # 최대 라운드 도달 시 강제 종료
-    if round_num >= max_rounds:
+    # 최대 라운드 도달 시 강제 종료 (>= 아니라 >로 수정)
+    if round_num > max_rounds:
         return "force_resolve"
 
     # 토론 메시지에서 합의 신호 감지

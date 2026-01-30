@@ -1,6 +1,6 @@
 """주제/후보 발제 노드
 
-ModeratorAgent를 사용하여 라운드 시작 발제를 수행합니다.
+ModeratorAgent를 사용하여 라운드 시작
 """
 
 from typing import Dict, Any
