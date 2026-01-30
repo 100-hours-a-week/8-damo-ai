@@ -22,6 +22,11 @@ env:
   MONGODB_URI: ${{ secrets.MONGODB_URI }}
   DB_NAME: ${{ secrets.DB_NAME }}
 
+  OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+  LANGFUSE_SECRET_KEY: ${{ secrets.LANGFUSE_SECRET_KEY }}
+  LANGFUSE_PUBLIC_KEY: ${{ secrets.LANGFUSE_PUBLIC_KEY }}
+  LANGFUSE_BASE_URL: ${{ secrets.LANGFUSE_BASE_URL }}
+
 jobs:
   ci:
     runs-on: ubuntu-latest
