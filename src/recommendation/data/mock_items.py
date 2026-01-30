@@ -1,6 +1,5 @@
 from src.recommendation.schemas.recommended_item import RecommendedItem
 from src.recommendation.schemas.recommendations_response import RecommendationsResponse
-from src.recommendation.schemas.analyze_refresh_response import AnalyzeRefreshResponse
 
 MOCK_DEV_ITEMS = [
     RecommendedItem(
@@ -31,9 +30,5 @@ MOCK_DEV_ITEMS = [
 ]
 
 MOCK_RECOMMENDATIONS_RESPONSE = RecommendationsResponse(
-    recommendation_count=1, recommended_items=MOCK_DEV_ITEMS
-)
-
-MOCK_ANALYZE_REFRESH_RESPONSE = AnalyzeRefreshResponse(
     recommendation_count=1, recommended_items=MOCK_DEV_ITEMS
 )

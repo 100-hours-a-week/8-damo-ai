@@ -58,3 +58,11 @@ Thumbs.db
 # ======================
 .env
 Dockerfile
+
+# ======================
+# Old Code
+# ======================
+**/db/legacy
+**/db/legacy/*
+**/db_manager_legacy.py
+**/database_legacy.py

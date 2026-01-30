@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse
 from src.recommendation.schemas.update_persona_db_request import UpdatePersonaDBRequest
 from src.recommendation.schemas.update_persona_db_response import (
@@ -6,23 +6,13 @@ from src.recommendation.schemas.update_persona_db_response import (
 )
 from src.recommendation.schemas.recommendations_request import RecommendationsRequest
 from src.recommendation.schemas.recommendations_response import RecommendationsResponse
-from src.recommendation.schemas.analyze_refresh_request import AnalyzeRefreshRequest
-from src.recommendation.schemas.analyze_refresh_response import AnalyzeRefreshResponse
 from src.recommendation.schemas.restaurant_fix_request import RestaurantFixRequest
 from src.recommendation.schemas.restaurant_fix_response import RestaurantFixResponse
-from src.recommendation.data.mock_items import (
-    MOCK_RECOMMENDATIONS_RESPONSE,
-    MOCK_ANALYZE_REFRESH_RESPONSE,
-)
-from src.recommendation.features.persona_manager.services.persona_service import (
-    PersonaService,
-)
-from src.shared.database import (
-    create_dining_session,
-    update_current_phase,
-    finalize_dining_session,
-)
-
+from src.recommendation.data.mock_items import MOCK_RECOMMENDATIONS_RESPONSE
+from src.recommendation.features.persona_manager.workflows.graph import persona_workflow
+from src.shared.database import create_dining_session, update_current_phase, finalize_dining_session
+from src.recommendation.workflows.workflow import recommendation_workflow
+from src.shared.db.db_manager import MongoManager
 
 router = APIRouter()
 
@@ -77,25 +67,61 @@ async def recommendations(request: RecommendationsRequest):
             content={"success": False, "message": "user_ids is empty"},
         )
 
-    # 세션 구현 부분
-    session_id = await create_dining_session(request)
-    if session_id is None:
-        return JSONResponse(
+    # # 세션 구현 부분
+    # session_id = await create_dining_session(request)
+    # if session_id is None:
+    #     return JSONResponse(
+    #         status_code=400,
+    #         content={"success": False, "message": "Dining session is already completed."}
+    #     )
+
+    result = await recommendation_workflow(request)
+    mongo = MongoManager()
+    await mongo.save_dining_session(request, result.get("filtered_restaurants", []), result.get("iteration_count", 0))
+
+    if result.get("is_error") == True:
+        raise HTTPException(
             status_code=400,
-            content={
-                "success": False,
-                "message": "Dining session is already completed.",
-            },
+            detail={
+                "error": result.get("error_message"),
+            }
         )
-    return MOCK_RECOMMENDATIONS_RESPONSE
+    
+    # 상위 5개 식당 매핑
+    recommended_items = []
+    for res in result.get("filtered_restaurants", [])[:5]:
+        # 1. 추천 메뉴 요약 생성 (예: 삼겹살 4개, 소주 4개, ...)
+        budget_rec = res.get("budget_recommendation", {})
+        menu_details = budget_rec.get("menu_details", [])
+        
+        if menu_details:
+            menu_summary = ", ".join([f"{m['title']} {m['count']}개" for m in menu_details])
+        else:
+            menu_summary = "추천 메뉴 구성 중"
+            
+        distance_m = res.get("distance", 0)
+        reason = f"{menu_summary} | 거리: {distance_m}m"
+        
+        recommended_items.append({
+            "restaurant_id": str(res.get("id") or res.get("_id")),
+            "score": float(res.get("total_score", 0.0)),
+            "reasoning_description": reason[:500]
+        })
+
+    return RecommendationsResponse(
+        recommendation_count=result.get("iteration_count", 0),
+        recommended_items=recommended_items,
+    )
+
+
 
 
 @router.post(
     "/analyze_refresh",
     summary="사용자가 재추천을 원할 경우 호출하는 API",
-    response_model=AnalyzeRefreshResponse,
+    response_model=RecommendationsResponse,
 )
-async def analyze_refresh(request: AnalyzeRefreshRequest):
+async def analyze_refresh(request: RecommendationsRequest):
     """
     식당 재추천시 호출하는 API로 내부 그래프 처리 후 최종 5개의 식당 정보를 반환합니다.
     """
@@ -105,18 +131,52 @@ async def analyze_refresh(request: AnalyzeRefreshRequest):
             content={"message": "diningData.diningId is required"},
         )
 
-    # analyze_refresh는 재추천이므로 is_refresh=True로 가정.
-    # refresh_count나 투표 결과 처리는 graph 내부 로직에 위임.
-    result = await update_current_phase(request.dining_data.dining_id)
-    if result is None:
-        return JSONResponse(
+    # # analyze_refresh는 재추천이므로 is_refresh=True로 가정.
+    # # refresh_count나 투표 결과 처리는 graph 내부 로직에 위임.
+    # result = await update_current_phase(request.dining_data.dining_id)
+    # if result is None:
+    #     return JSONResponse(
+    #         status_code=400,
+    #         content={"success": False, "message": "Dining session not found or already completed."}
+    #     )
+    # return result
+
+    result = await recommendation_workflow(request)
+    
+    if result.get("is_error") == True:
+        raise HTTPException(
             status_code=400,
-            content={
-                "success": False,
-                "message": "Dining session not found or already completed.",
-            },
+            detail={
+                "error": result.get("error_message"),
+            }
         )
-    return result
+    
+    # 상위 5개 식당 매핑
+    recommended_items = []
+    for res in result.get("filtered_restaurants", [])[:5]:
+        budget_rec = res.get("budget_recommendation", {})
+        menu_details = budget_rec.get("menu_details", [])
+        
+        if menu_details:
+            menu_summary = ", ".join([f"{m['title']} {m['count']}개" for m in menu_details])
+        else:
+            menu_summary = "추천 메뉴 구성 중"
+
+        distance_m = res.get("distance", 0)
+        reason = f"{menu_summary} | 거리: {distance_m}m"
+        
+        recommended_items.append({
+            "restaurant_id": str(res.get("id") or res.get("_id")),
+            "score": float(res.get("total_score", 0.0)),
+            "reasoning_description": reason[:500]
+        })
+
+    return RecommendationsResponse(
+        recommendation_count=result.get("iteration_count", 0),
+        recommended_items=recommended_items,
+    )
+
+
 
 
 @router.post(

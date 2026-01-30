@@ -1,7 +1,8 @@
 # Restaurant Service - AI Pipeline
 
-> [!NOTE]
-> 260128 리팩토링 진행
+> [!INFO]
+> 260129 통합과정 진행
+
 
 LangGraph 기반의 AI 서버 파이프라인 구조입니다.
 - 
