@@ -1,0 +1,26 @@
+{"allergy_type": "LEGUMES", "keywords": ["콩", "두류", "렌틸콩", "병아리콩", "완두콩"]}
+{"allergy_type": "NUTS", "keywords": ["견과", "견과류", "호두", "잣", "땅콩", "아몬드", "캐슈넛", "피칸"]}
+{"allergy_type": "SHELLFISH", "keywords": ["갑각류", "조개류", "새우", "게", "랍스터", "크랩", "가재", "바닷가재"]}
+{"allergy_type": "FISH", "keywords": ["생선", "어류", "회", "참치", "연어", "광어", "고등어", "삼치", "방어"]}
+{"allergy_type": "GRAINS", "keywords": ["곡물", "곡류", "밀", "쌀", "보리", "귀리", "호밀"]}
+{"allergy_type": "MILK", "keywords": ["우유", "유제품", "치즈", "크림", "버터", "요거트", "요구르트", "생크림", "휘핑크림"]}
+{"allergy_type": "SHRIMP", "keywords": ["새우", "쉬림프"]}
+{"allergy_type": "OYSTER", "keywords": ["굴", "오이스터"]}
+{"allergy_type": "CRAB", "keywords": ["게", "크랩"]}
+{"allergy_type": "MUSSEL", "keywords": ["홍합"]}
+{"allergy_type": "SQUID", "keywords": ["오징어", "낙지", "문어", "쭈꾸미", "주꾸미"]}
+{"allergy_type": "ABALONE", "keywords": ["전복"]}
+{"allergy_type": "MACKEREL", "keywords": ["고등어", "삼치"]}
+{"allergy_type": "BUCKWHEAT", "keywords": ["메밀"]}
+{"allergy_type": "WHEAT", "keywords": ["밀", "밀가루", "빵", "파스타", "우동", "라면", "국수"]}
+{"allergy_type": "SOYBEAN", "keywords": ["콩", "대두", "두부", "된장", "간장", "청국장", "비지"]}
+{"allergy_type": "WALNUT", "keywords": ["호두"]}
+{"allergy_type": "PEANUT", "keywords": ["땅콩", "피넛"]}
+{"allergy_type": "PINE_NUT", "keywords": ["잣"]}
+{"allergy_type": "EGG", "keywords": ["계란", "달걀", "에그", "계란말이", "계란찜", "달걀찜"]}
+{"allergy_type": "BEEF", "keywords": ["소고기", "쇠고기", "비프", "우육", "한우"]}
+{"allergy_type": "PORK", "keywords": ["돼지고기", "삼겹살", "포크", "돈육", "목살", "항정살"]}
+{"allergy_type": "CHICKEN", "keywords": ["닭", "치킨", "닭고기", "계육"]}
+{"allergy_type": "PEACH", "keywords": ["복숭아", "천도복숭아"]}
+{"allergy_type": "TOMATO", "keywords": ["토마토"]}
+{"allergy_type": "SULFITES", "keywords": ["아황산염", "이산화황", "방부제"]}
