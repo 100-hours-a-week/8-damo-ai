@@ -1,9 +1,11 @@
 import os
+from datetime import datetime
 from motor.motor_asyncio import AsyncIOMotorClient
 from pymongo import UpdateOne, errors, GEOSPHERE, ReturnDocument
 from typing import List, Dict, Any, Optional, Union
 from src.core.config import settings
 from src.recommendation.schemas.recommendations_request import RecommendationsRequest
+from src.recommendation.workflows.states.recommendation_state import RecommendationState
 
 class MongoManager:
     def __init__(self, uri: str = settings.MONGODB_URI, db_name: str = settings.DB_NAME, col_name: str = ""):
@@ -85,33 +87,92 @@ class MongoManager:
         return await cursor.to_list(length=None)
 
     # 회식 세션을 저장하는 함수
-    async def save_dining_session(self, request: RecommendationsRequest, filtered_restaurants: List[Dict[str, Any]], iteration_count: int):
+    async def save_dining_session(self, result: RecommendationState):
         """
         추천 결과를 dining_sessions 컬렉션에 저장 또는 업데이트합니다.
+        1. 데이터가 들어오면 diningId 기반으로 문서를 검색한다.
+        1-1. (문서가 있을 경우) 특정 항목을 업데이트한다. (후보 리스트 및 업데이트 시간)
+        1-2. (문서가 없을 경우) 새로운 문서를 만든다.
         """
         try:
+            # 컬렉션 전환
             self.set_collection("dining_sessions")
             
-            session_data = {
-                "diningId": request.dining_data.dining_id,
-                "budget": request.dining_data.budget,
-                "currentPhase": iteration_count + 1,
-                "diningDate": request.dining_data.dining_date,
-                "finalRestaurant": None,
-                "groupsId": request.dining_data.groups_id,
-                "isCompleted": False,
-                "phases": [],
-                "restaurantCandidate": filtered_restaurants, # 상위 5개 저장
-                "x": request.dining_data.x,
-                "y": request.dining_data.y
-            }
-            
-            # diningId 기준 Upsert
-            await self.collection.update_one(
-                {"diningId": request.dining_data.dining_id},
-                {"$set": session_data},
-                upsert=True
-            )
+            user_ids = result.get("user_ids")
+            dining_data = result.get("dining_data")
+            restaurant_candidates = result.get("filtered_restaurants")
+            rejected_candidates = result.get("rejected_restaurants")
+            phases = result.get("vote_result_list")
+            status_message = result.get("status_message")
+
+            if dining_data is None:
+                print("세션 저장 실패: dining_data가 없습니다.")
+                return False
+
+            # 1. dining_info 추출 (Pydantic 모델 또는 dict 대응)
+            if hasattr(dining_data, "model_dump"):  # Pydantic v2
+                dining_info = dining_data.model_dump()
+            elif hasattr(dining_data, "dict"):      # Pydantic v1
+                dining_info = dining_data.dict()
+            elif isinstance(dining_data, dict):
+                dining_info = dining_data
+            else:
+                dining_info = {}
+
+            # 2. dining_id 확보 (state direct -> info 순서)
+            dining_id = result.get("dining_id")
+            if dining_id is None:
+                dining_id = dining_info.get("diningId") or dining_info.get("dining_id")
+            if dining_id is None:
+                print("세션 저장 실패: diningId를 찾을 수 없습니다.")
+                return False
+
+            # 문서 검색 (diningId 기준)
+            existing = await self.read_one({"diningId": dining_id})
+            now = datetime.now()
+
+            if existing:
+                # 있을 경우 (UPDATE)
+                update_query = {
+                    "$set": {
+                        "userIds": user_ids,
+                        "restaurantCandidate": restaurant_candidates,
+                        "phases": phases,
+                        "updatedAt": now,
+                    },
+                    "$push": {
+                        "statusMessage": {"$each": status_message}
+                    }
+                }
+                
+                # 거절된 식당이 있으면 push ($each 사용으로 리스트 병합)
+                if rejected_candidates:
+                    update_query["$push"]["rejectedCandidate"] = {"$each": rejected_candidates}
+
+                await self.collection.update_one({"diningId": dining_id}, update_query)
+                await self.update_phase_count({"diningId": dining_id}, "currentPhase")
+            else:
+                # 없을 경우 (CREATE)
+                session_data = {
+                    "userIds": user_ids,
+                    "diningId": dining_id,
+                    "budget": dining_info.get("budget"),
+                    "currentPhase": 1,
+                    "diningDate": dining_info.get("diningDate") or dining_info.get("dining_date"),
+                    "finalRestaurant": None,
+                    "groupsId": dining_info.get("groupsId") or dining_info.get("groups_id"),
+                    "isCompleted": False,
+                    "phases": phases,
+                    "restaurantCandidate": restaurant_candidates,
+                    "rejectedCandidate": [],
+                    "statusMessage": status_message,
+                    "x": dining_info.get("x"),
+                    "y": dining_info.get("y"),
+                    "createdAt": now,
+                    "updatedAt": now
+                }
+                await self.create_one(session_data)
+
             return True
         except Exception as e:
             print(f"세션 저장 중 오류 발생: {str(e)}")
