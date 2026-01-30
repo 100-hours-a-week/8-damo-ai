@@ -4,6 +4,7 @@ from .initialize_state import initialize_state_node
 from .topic_proposal import topic_proposal_node
 from .agent_discussion import agent_discussion_node
 from .summarize import summarize_node
+from .consensus_guide import consensus_guide_node
 from .vote import vote_node
 from .final_select import final_select_node
 from .force_resolve import force_resolve_node
@@ -13,6 +14,7 @@ __all__ = [
     "topic_proposal_node",
     "agent_discussion_node",
     "summarize_node",
+    "consensus_guide_node",
     "vote_node",
     "final_select_node",
     "force_resolve_node",

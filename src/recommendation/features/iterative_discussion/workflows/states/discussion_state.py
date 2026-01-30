@@ -8,7 +8,8 @@ class DiscussionState(TypedDict):
     Attributes:
         round: 현재 라운드 번호
         messages: 전체 대화 로그
-        candidates: 후보 식당 목록 (Restaurant 객체들)
+        candidates: 후보 식당 목록 (Restaurant 객체들) - 초기 후보
+        final_candidates: 최종 투표용 식당 목록 (5개로 좁혀진 후보)
         votes: agent_id -> restaurant_id 투표 현황
         consensus_reached: 합의 도달 여부
         final_decision: 최종 선정된 식당 ID
@@ -19,6 +20,7 @@ class DiscussionState(TypedDict):
     round: int
     messages: List[BaseMessage]
     candidates: List[Any]  # List[Restaurant] - 순환 참조 방지를 위해 Any 사용
+    final_candidates: List[Any]  # 토론 후 선정된 최종 5개 후보
     votes: Dict[str, str]
     consensus_reached: bool
     final_decision: Optional[str]

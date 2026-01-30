@@ -23,9 +23,9 @@ from .nodes import (
     topic_proposal_node,
     agent_discussion_node,
     summarize_node,
+    consensus_guide_node,
     vote_node,
     final_select_node,
-    force_resolve_node,
 )
 from .edges.conditions import check_consensus
 
@@ -53,31 +53,32 @@ async def create_discussion_graph(
     builder.add_node("topic_proposal", topic_proposal_node)
     builder.add_node("agent_discussion", agent_discussion_node)
     builder.add_node("summarize", summarize_node)
+    builder.add_node("consensus_guide", consensus_guide_node)
     builder.add_node("vote", vote_node)
     builder.add_node("final_select", final_select_node)
-    builder.add_node("force_resolve", force_resolve_node)
 
     # 엣지 연결
     builder.add_edge(START, "initialize_state")
     builder.add_edge("initialize_state", "topic_proposal")
     builder.add_edge("topic_proposal", "agent_discussion")
     builder.add_edge("agent_discussion", "summarize")
-    builder.add_edge("summarize", "vote")
+    builder.add_edge("summarize", "consensus_guide")
 
-    # 조건부 엣지: 합의 확인
+    # 조건부 엣지: 합의 확인 (토론 후 바로 체크)
     builder.add_conditional_edges(
-        "vote",
+        "consensus_guide",
         check_consensus,
         {
-            "consensus": "final_select",
-            "no_consensus": "topic_proposal",
-            "force_resolve": "force_resolve",
+            "no_consensus": "topic_proposal",  # 다음 라운드
+            "force_resolve": "final_select",  # 최대 라운드 도달
         },
     )
 
-    # 최종 노드에서 종료
-    builder.add_edge("final_select", END)
-    builder.add_edge("force_resolve", END)
+    # 최종 결정 후 실제 사용자 투표
+    builder.add_edge("final_select", "vote")
+
+    # 투표 후 종료
+    builder.add_edge("vote", END)
 
     # 그래프 컴파일
     graph = builder.compile()
@@ -87,6 +88,7 @@ async def create_discussion_graph(
         "round": 0,  # initialize_state_node에서 1로 설정됨
         "messages": [],
         "candidates": candidate_restaurants,
+        "final_candidates": [],  # 토론 후 선정됨
         "votes": {},
         "consensus_reached": False,
         "final_decision": None,
