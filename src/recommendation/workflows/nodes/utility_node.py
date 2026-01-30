@@ -16,3 +16,11 @@ def error_branch_node(state: RecommendationState) -> str:
         return 'error'
     else:
         return 'next'
+
+def analyze_refresh_branch(state: RecommendationState) -> str:
+    if state.get("is_error"):
+        return "error"
+    # 서브그래프에서 심어놓은 플래그 확인
+    if state.get("is_diffrent_user") or state.get("is_empty_restaurants"):
+        return "filter"
+    return "next"

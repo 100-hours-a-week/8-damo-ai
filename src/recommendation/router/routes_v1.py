@@ -13,6 +13,7 @@ from src.recommendation.features.persona_manager.workflows.graph import persona_
 from src.shared.database import create_dining_session, update_current_phase, finalize_dining_session
 from src.recommendation.workflows.workflow import recommendation_workflow
 from src.shared.db.db_manager import MongoManager
+import asyncio
 
 router = APIRouter()
 
@@ -33,7 +34,7 @@ async def update_persona_db(request: UpdatePersonaDBRequest):
 
     # LangGraph 워크플로우 실행
     try:
-        result = await persona_workflow.ainvoke({"request_data": request})
+        result = await asyncio.wait_for(persona_workflow.ainvoke({"request_data": request}), timeout=120.0)
         final_doc = result.get("final_document")
 
         if not final_doc:
@@ -44,12 +45,16 @@ async def update_persona_db(request: UpdatePersonaDBRequest):
 
         return UpdatePersonaDBResponse(success=True, user_id=final_doc.id)
 
+    except asyncio.TimeoutError:
+        raise HTTPException(
+            status_code=504,
+            detail={"error": "프로세스가 너무 오래 걸려 중단되었습니다. 잠시 후 다시 시도해주세요."}
+        )
     except Exception as e:
         return JSONResponse(
             status_code=500,
             content={"success": False, "message": str(e)},
         )
-
 
 @router.post(
     "/recommendations",
@@ -72,17 +77,14 @@ async def recommendations(request: RecommendationsRequest):
             content={"success": False, "message": "user_ids is empty"},
         )
 
-    # # 세션 구현 부분
-    # session_id = await create_dining_session(request)
-    # if session_id is None:
-    #     return JSONResponse(
-    #         status_code=400,
-    #         content={"success": False, "message": "Dining session is already completed."}
-    #     )
+    try:
+        result = await asyncio.wait_for(recommendation_workflow(request), timeout=180.0)
 
-    result = await recommendation_workflow(request)
-    mongo = MongoManager()
-    await mongo.save_dining_session(request, result.get("filtered_restaurants", []), result.get("iteration_count", 0))
+    except asyncio.TimeoutError:
+        raise HTTPException(
+            status_code=504,
+            detail={"error": "추천 프로세스가 너무 오래 걸려 중단되었습니다. 잠시 후 다시 시도해주세요."}
+        )
 
     if result.get("is_error") == True:
         raise HTTPException(
@@ -91,7 +93,10 @@ async def recommendations(request: RecommendationsRequest):
                 "error": result.get("error_message"),
             }
         )
-    
+
+    mongo = MongoManager()
+    await mongo.save_dining_session(result)
+
     # 상위 5개 식당 매핑
     recommended_items = []
     for res in result.get("filtered_restaurants", [])[:5]:
@@ -119,8 +124,6 @@ async def recommendations(request: RecommendationsRequest):
     )
 
 
-
-
 @router.post(
     "/analyze_refresh",
     summary="사용자가 재추천을 원할 경우 호출하는 API",
@@ -136,17 +139,13 @@ async def analyze_refresh(request: RecommendationsRequest):
             content={"message": "diningData.diningId is required"},
         )
 
-    # # analyze_refresh는 재추천이므로 is_refresh=True로 가정.
-    # # refresh_count나 투표 결과 처리는 graph 내부 로직에 위임.
-    # result = await update_current_phase(request.dining_data.dining_id)
-    # if result is None:
-    #     return JSONResponse(
-    #         status_code=400,
-    #         content={"success": False, "message": "Dining session not found or already completed."}
-    #     )
-    # return result
-
-    result = await recommendation_workflow(request)
+    try:
+        result = await asyncio.wait_for(recommendation_workflow(request), timeout=180.0)
+    except asyncio.TimeoutError:
+        raise HTTPException(
+            status_code=504,
+            detail={"error": "추천 프로세스가 너무 오래 걸려 중단되었습니다. 잠시 후 다시 시도해주세요."}
+        )
     
     if result.get("is_error") == True:
         raise HTTPException(
@@ -156,7 +155,10 @@ async def analyze_refresh(request: RecommendationsRequest):
             }
         )
     
-    # 상위 5개 식당 매핑
+    mongo = MongoManager()
+    await mongo.save_dining_session(result)
+
+    # # 상위 5개 식당 매핑
     recommended_items = []
     for res in result.get("filtered_restaurants", [])[:5]:
         budget_rec = res.get("budget_recommendation", {})
@@ -180,8 +182,6 @@ async def analyze_refresh(request: RecommendationsRequest):
         recommendation_count=result.get("iteration_count", 0),
         recommended_items=recommended_items,
     )
-
-
 
 
 @router.post(

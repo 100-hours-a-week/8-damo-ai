@@ -69,10 +69,10 @@ def test_recommendations():
             "groupsId": 10,
             "diningDate": "2024-02-01T19:00:00",
             "budget": 50000,
-            "x": "127.12345",  # Added required field
-            "y": "37.12345",  # Added required field
+            "x": "127.1111",  # Added required field
+            "y": "37.3947",  # Added required field
         },
-        "userIds": ["123456789"],
+        "userIds": [1001, 1002, 1003],
     }
     response = client.post("/ai/api/v1/recommendations", json=payload)
     if response.status_code != 200:
@@ -100,11 +100,10 @@ def test_analyze_refresh():
             "groupsId": 10,
             "diningDate": "2024-02-01T19:00:00",
             "budget": 50000,
-            "x": "127.12345",  # Added required field
-            "y": "37.12345",  # Added required field
+            "x": "127.1111",  # Added required field
+            "y": "37.3947",  # Added required field
         },
-        "userIds": [123456789],
-        "voteResultList": [],
+        "userIds": [1001, 1002, 1003],
     }
     client.post("/ai/api/v1/recommendations", json=setup_payload)
 
@@ -117,7 +116,7 @@ def test_analyze_refresh():
             "x": "127.12345",  # Added required field
             "y": "37.12345",  # Added required field
         },
-        "userIds": [123456789],
+        "userIds": [1001, 1002, 1003],
         "voteResultList": [],
     }
     response = client.post("/ai/api/v1/analyze_refresh", json=payload)
@@ -141,16 +140,20 @@ def test_restaurant_fix():
             "groupsId": 10,
             "diningDate": "2024-02-01T19:00:00",
             "budget": 50000,
-            "x": "127.12345", "y": "37.12345",
+            "x": "127.1111",  # Added required field
+            "y": "37.3947",  # Added required field
         },
-        "userIds": [123456789],
+        "userIds": [1001, 1002, 1003],
     }
-    client.post("/ai/api/v1/recommendations", json=setup_payload)
+    setup_res = client.post("/ai/api/v1/recommendations", json=setup_payload)
+    assert setup_res.status_code == 200
+    setup_data = setup_res.json()
+    real_restaurant_id = setup_data["recommendedItems"][0]["restaurantId"]
     
     # 2. 결과 확정 요청
     payload = {
         "diningData": setup_payload["diningData"],
-        "restaurantId": "6976b54010e1fa815903d4ce",
+        "restaurantId": real_restaurant_id,
         "voteResultList": [],
     }
     response = client.post("/ai/api/v1/restaurant_fix", json=payload)
@@ -158,4 +161,4 @@ def test_restaurant_fix():
     assert response.status_code == 200
     data = response.json()
     assert data["success"] is True
-    assert data["restaurantId"] == "6976b54010e1fa815903d4ce"
+    assert data["restaurantId"] == real_restaurant_id

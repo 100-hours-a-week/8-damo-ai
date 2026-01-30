@@ -63,7 +63,7 @@ async def allergy_node(state: RecommendationState) -> RecommendationState:
     # Langfuse 클라이언트 초기화
     langfuse_handler = CallbackHandler()
     mongo = MongoManager()
-    mongo.set_collection("user_mockup")
+    mongo.set_collection("user")
     keywords_map = __load_allergy_keywords()
 
     try:
