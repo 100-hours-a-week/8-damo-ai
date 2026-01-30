@@ -85,7 +85,6 @@ jobs:
           run.prod.sh \
           run.dev.sh \
           run.test.sh \
-          scripts \
           pyproject.toml
 
         chmod 644 ai-app.tar.gz
