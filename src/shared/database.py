@@ -152,7 +152,8 @@ async def finalize_dining_session(dining_id: int, restaurant_id: str) -> Restaur
     
     # 2. 후보군 중 선택된 식당 찾기
     selected_restaurant = next(
-        (r for r in session_doc.get("restaurantCandidate", []) if r["restaurantId"] == restaurant_id), 
+        (r for r in session_doc.get("restaurantCandidate", []) 
+         if (r.get("restaurantId") or r.get("id") or str(r.get("_id", ""))) == restaurant_id), 
         None
     )
 
