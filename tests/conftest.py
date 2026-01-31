@@ -1,7 +1,6 @@
 import pytest
-import asyncio
 from src.core.config import settings
-from src.shared.database import get_client
+from pymongo import MongoClient
 
 # 테스트용 DB 이름 설정
 TEST_DB_NAME = "damo_test_db"
@@ -17,17 +16,19 @@ def override_db_settings():
 
     yield
 
-    # 테스트 종료 후 원래 설정으로 원복 (사실 프로세스 종료되므로 필수는 아님)
+    # 테스트 종료 후 원래 설정으로 원복
     settings.DB_NAME = original_db_name
 
 
 @pytest.fixture(scope="function", autouse=True)
-async def clean_db():
+def clean_db():
     """
-    매 테스트 함수 실행 후 테스트 DB를 삭제(Drop)하여
     테스트 간 데이터 간섭을 방지하고 실제 DB 오염을 막습니다.
+    동기/비동기 테스트 호환성을 위해 Pymongo(동기 드라이버)를 사용합니다.
     """
     yield  # 테스트 함수 실행
 
-    client = get_client()
-    await client.drop_database(TEST_DB_NAME)
+    # 동기 방식으로 DB 삭제
+    client = MongoClient(settings.MONGODB_URI)
+    client.drop_database(TEST_DB_NAME)
+    client.close()
