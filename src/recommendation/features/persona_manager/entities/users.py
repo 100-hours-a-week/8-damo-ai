@@ -3,6 +3,7 @@ from pydantic.alias_generators import to_camel
 from pydantic import BaseModel, Field, ConfigDict
 from datetime import datetime
 from src.recommendation.enums import AllergyType, Gender, AgeGroup
+from src.recommendation.schemas.review_data import ReviewData
 
 
 class Users(BaseModel):
@@ -18,7 +19,8 @@ class Users(BaseModel):
     like_food_categories_id: List[str]
     categories_id: List[str]
     other_characteristics: str
-    base_persona: str
+    reviews: List[ReviewData] = Field(default_factory=list)
+    base_persona: Optional[str] = None
 
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: datetime = Field(default_factory=datetime.now)
