@@ -124,8 +124,8 @@ def test_analyze_refresh():
             "groupsId": 10,
             "diningDate": "2024-02-01T19:00:00",
             "budget": 50000,
-            "x": "127.12345",  # Added required field
-            "y": "37.12345",  # Added required field
+            "x": "127.1111",  # Matches seed_restaurants location
+            "y": "37.3947",  # Matches seed_restaurants location
         },
         "userIds": [1001, 1002, 1003],
         "voteResultList": [],
