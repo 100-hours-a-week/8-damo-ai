@@ -1,12 +1,13 @@
 # LangGraph 기본 설정
 from langgraph.graph import StateGraph, START, END
+from langgraph.store.memory import InMemoryStore
 # State, Model 등 스키마 구조
 from src.recommendation.workflows.states.recommendation_state import RecommendationState
 from src.recommendation.schemas.recommendations_request import RecommendationsRequest
 from src.recommendation.schemas.recommendations_response import RecommendationsResponse
 # 노드
 from src.recommendation.workflows.nodes.utility_node import (
-    branch_node, error_branch_node
+    branch_node, error_branch_node, analyze_refresh_branch
 )
 from src.recommendation.workflows.nodes.restaurant_filtering import restaurant_filtering_node
 from src.recommendation.workflows.nodes.analyze_refresh import analyze_refresh_node
@@ -37,18 +38,23 @@ def __initial_state(request: RecommendationsRequest) -> RecommendationState:
         user_ids=request.user_ids,
         dining_id=request.dining_data.dining_id,
         dining_data=request.dining_data,
+        rejected_restaurants=[],
         filtered_restaurants=[],
         current_recommendation={},
         personas=[],
         status_message=[
             "재추천 실행" if is_vote_exists else "최초 추천 실행",
             "프로세스 시작",
+            f"현재 인원 : {len(request.user_ids)}명",
+            f"인원 아이디 : {', '.join(map(str, request.user_ids))}",
         ],
         iteration_count=0,
         max_iterations=3,
         user_satisfied=False,
         process_start_time=datetime.now(),
         process_time=0.0,
+        is_diffrent_user=False,
+        is_empty_restaurants=False,
         is_error=False,
         error_message="",
     )
@@ -61,6 +67,7 @@ def __initial_state(request: RecommendationsRequest) -> RecommendationState:
     }
     
     return initial_state
+
 
 async def recommendation_workflow(request: RecommendationsRequest):
     """
@@ -91,11 +98,13 @@ async def recommendation_workflow(request: RecommendationsRequest):
     workflow.add_edge("restaurant_filtering", END)
     workflow.add_conditional_edges(
         "analyze_refresh",
-        error_branch_node,
-        {"error": END, "next": END},
+        analyze_refresh_branch,
+        {"filter": "restaurant_filtering", "error": END, "next": END},
     )
 
-    app = workflow.compile()
+    _store = InMemoryStore()
+    app = workflow.compile(store=_store)
     result_state = await app.ainvoke(initial_state)
 
     return result_state
+

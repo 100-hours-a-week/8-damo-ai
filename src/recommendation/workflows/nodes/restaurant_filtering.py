@@ -12,8 +12,10 @@ def __error_handler_node(state: RecommendationState) -> str:
         return "error"
     return "next"
 
-# 1. 서브 그래프 조립
 sub_builder = StateGraph(RecommendationState)
+
+# 프로덕션 용
+# 1. 서브 그래프 조립
 sub_builder.add_node("distance", distance_node)
 sub_builder.add_node("allergy", allergy_node)
 sub_builder.add_node("budget", budget_node)
@@ -22,5 +24,16 @@ sub_builder.add_edge(START, "distance")
 sub_builder.add_conditional_edges("distance", __error_handler_node, {"error": END, "next": "allergy"})
 sub_builder.add_conditional_edges("allergy", __error_handler_node, {"error": END, "next": "budget"})
 sub_builder.add_edge("budget", END)
+
+# # 디버그 용
+# # 1. 서브 그래프 조립
+# sub_builder.add_node("distance", distance_node)
+# sub_builder.add_node("budget", budget_node)
+# # 2. 서브 그래프 연결
+# sub_builder.add_edge(START, "distance")
+# sub_builder.add_conditional_edges("distance", __error_handler_node, {"error": END, "next": "budget"})
+# sub_builder.add_edge("budget", END)
+
+
 # 3. 컴파일
 restaurant_filtering_node = sub_builder.compile()

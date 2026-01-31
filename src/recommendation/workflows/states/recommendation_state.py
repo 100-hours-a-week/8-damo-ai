@@ -1,5 +1,4 @@
 from typing import TypedDict, Annotated, List, Union
-import operator
 from datetime import datetime
 
 def add_status_with_time(current: List[dict], new: Union[str, dict, List[Union[str, dict]]]) -> List[dict]:
@@ -21,13 +20,22 @@ def add_status_with_time(current: List[dict], new: Union[str, dict, List[Union[s
                 item["timestamp"] = datetime.now().isoformat()
             formatted_new.append(item)
             
-    return current + formatted_new
+    # --- 중복 방지 로직 추가 ---
+    # 이미 'current'에 존재하는 (메시지 내용 + 시간) 쌍은 제외하고 추가합니다.
+    current_indices = set((m.get("msg"), m.get("timestamp")) for m in current)
+    unique_new = [
+        m for m in formatted_new 
+        if (m.get("msg"), m.get("timestamp")) not in current_indices
+    ]
+    
+    return current + unique_new
 
 class RecommendationState(TypedDict):
     user_ids: List[int]
     dining_id: int
     dining_data: dict
     filtered_restaurants: List[dict]
+    rejected_restaurants: List[dict]
     current_recommendation: dict
     personas: List[dict]
 
@@ -38,6 +46,10 @@ class RecommendationState(TypedDict):
 
     process_start_time: datetime
     process_time: float
+
+    # 재시도 분기
+    is_diffrent_user: bool
+    is_empty_restaurants: bool
 
     # 투표 결과
     is_initial_workflow: bool

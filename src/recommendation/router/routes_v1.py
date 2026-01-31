@@ -9,12 +9,24 @@ from src.recommendation.schemas.recommendations_response import RecommendationsR
 from src.recommendation.schemas.restaurant_fix_request import RestaurantFixRequest
 from src.recommendation.schemas.restaurant_fix_response import RestaurantFixResponse
 from src.recommendation.data.mock_items import MOCK_RECOMMENDATIONS_RESPONSE
-from src.recommendation.features.persona_manager.workflows.graph import persona_workflow
-from src.shared.database import create_dining_session, update_current_phase, finalize_dining_session
+from src.recommendation.features.persona_manager.entities.users import Users
+from src.recommendation.features.persona_manager.repositories.users_repository import (
+    UsersRepository,
+)
+from src.recommendation.features.persona_manager.create_persona_description import (
+    create_persona_description,
+)
+from src.shared.database import (
+    create_dining_session,
+    update_current_phase,
+    finalize_dining_session,
+)
 from src.recommendation.workflows.workflow import recommendation_workflow
 from src.shared.db.db_manager import MongoManager
+import asyncio
 
 router = APIRouter()
+
 
 @router.post(
     "/update_persona_db",
@@ -31,18 +43,22 @@ async def update_persona_db(request: UpdatePersonaDBRequest):
             content={"success": False, "message": "data is empty or is not exists"},
         )
 
-    # LangGraph 워크플로우 실행
     try:
-        result = await persona_workflow.ainvoke({"request_data": request})
-        final_doc = result.get("final_document")
+        # 1. LLM을 사용하여 페르소나 텍스트 생성
+        persona_description = await create_persona_description(request)
 
-        if not final_doc:
-            return JSONResponse(
-                status_code=500,
-                content={"success": False, "message": "Failed to generate persona"},
-            )
+        # 2. Users 엔티티 생성
+        user_entity = Users(
+            **request.user_data.model_dump(),
+            reviews=request.review_data,
+            base_persona=persona_description,
+        )
 
-        return UpdatePersonaDBResponse(success=True, user_id=final_doc.id)
+        # 3. DB 저장
+        repo = UsersRepository()
+        saved_user = await repo.save(user_entity)
+
+        return UpdatePersonaDBResponse(success=True, user_id=saved_user.id)
 
     except Exception as e:
         return JSONResponse(
@@ -72,53 +88,57 @@ async def recommendations(request: RecommendationsRequest):
             content={"success": False, "message": "user_ids is empty"},
         )
 
-    # # 세션 구현 부분
-    # session_id = await create_dining_session(request)
-    # if session_id is None:
-    #     return JSONResponse(
-    #         status_code=400,
-    #         content={"success": False, "message": "Dining session is already completed."}
-    #     )
+    try:
+        result = await asyncio.wait_for(recommendation_workflow(request), timeout=180.0)
 
-    result = await recommendation_workflow(request)
-    mongo = MongoManager()
-    await mongo.save_dining_session(request, result.get("filtered_restaurants", []), result.get("iteration_count", 0))
+    except asyncio.TimeoutError:
+        raise HTTPException(
+            status_code=504,
+            detail={
+                "error": "추천 프로세스가 너무 오래 걸려 중단되었습니다. 잠시 후 다시 시도해주세요."
+            },
+        )
 
     if result.get("is_error") == True:
         raise HTTPException(
             status_code=400,
             detail={
                 "error": result.get("error_message"),
-            }
+            },
         )
-    
+
+    mongo = MongoManager()
+    await mongo.save_dining_session(result)
+
     # 상위 5개 식당 매핑
     recommended_items = []
     for res in result.get("filtered_restaurants", [])[:5]:
         # 1. 추천 메뉴 요약 생성 (예: 삼겹살 4개, 소주 4개, ...)
         budget_rec = res.get("budget_recommendation", {})
         menu_details = budget_rec.get("menu_details", [])
-        
+
         if menu_details:
-            menu_summary = ", ".join([f"{m['title']} {m['count']}개" for m in menu_details])
+            menu_summary = ", ".join(
+                [f"{m['title']} {m['count']}개" for m in menu_details]
+            )
         else:
             menu_summary = "추천 메뉴 구성 중"
-            
+
         distance_m = res.get("distance", 0)
         reason = f"{menu_summary} | 거리: {distance_m}m"
-        
-        recommended_items.append({
-            "restaurant_id": str(res.get("id") or res.get("_id")),
-            "score": float(res.get("total_score", 0.0)),
-            "reasoning_description": reason[:500]
-        })
+
+        recommended_items.append(
+            {
+                "restaurant_id": str(res.get("id") or res.get("_id")),
+                "score": float(res.get("total_score", 0.0)),
+                "reasoning_description": reason[:500],
+            }
+        )
 
     return RecommendationsResponse(
         recommendation_count=result.get("iteration_count", 0),
         recommended_items=recommended_items,
     )
-
-
 
 
 @router.post(
@@ -136,52 +156,55 @@ async def analyze_refresh(request: RecommendationsRequest):
             content={"message": "diningData.diningId is required"},
         )
 
-    # # analyze_refresh는 재추천이므로 is_refresh=True로 가정.
-    # # refresh_count나 투표 결과 처리는 graph 내부 로직에 위임.
-    # result = await update_current_phase(request.dining_data.dining_id)
-    # if result is None:
-    #     return JSONResponse(
-    #         status_code=400,
-    #         content={"success": False, "message": "Dining session not found or already completed."}
-    #     )
-    # return result
+    try:
+        result = await asyncio.wait_for(recommendation_workflow(request), timeout=180.0)
+    except asyncio.TimeoutError:
+        raise HTTPException(
+            status_code=504,
+            detail={
+                "error": "추천 프로세스가 너무 오래 걸려 중단되었습니다. 잠시 후 다시 시도해주세요."
+            },
+        )
 
-    result = await recommendation_workflow(request)
-    
     if result.get("is_error") == True:
         raise HTTPException(
             status_code=400,
             detail={
                 "error": result.get("error_message"),
-            }
+            },
         )
-    
-    # 상위 5개 식당 매핑
+
+    mongo = MongoManager()
+    await mongo.save_dining_session(result)
+
+    # # 상위 5개 식당 매핑
     recommended_items = []
     for res in result.get("filtered_restaurants", [])[:5]:
         budget_rec = res.get("budget_recommendation", {})
         menu_details = budget_rec.get("menu_details", [])
-        
+
         if menu_details:
-            menu_summary = ", ".join([f"{m['title']} {m['count']}개" for m in menu_details])
+            menu_summary = ", ".join(
+                [f"{m['title']} {m['count']}개" for m in menu_details]
+            )
         else:
             menu_summary = "추천 메뉴 구성 중"
 
         distance_m = res.get("distance", 0)
         reason = f"{menu_summary} | 거리: {distance_m}m"
-        
-        recommended_items.append({
-            "restaurant_id": str(res.get("id") or res.get("_id")),
-            "score": float(res.get("total_score", 0.0)),
-            "reasoning_description": reason[:500]
-        })
+
+        recommended_items.append(
+            {
+                "restaurant_id": str(res.get("id") or res.get("_id")),
+                "score": float(res.get("total_score", 0.0)),
+                "reasoning_description": reason[:500],
+            }
+        )
 
     return RecommendationsResponse(
         recommendation_count=result.get("iteration_count", 0),
         recommended_items=recommended_items,
     )
-
-
 
 
 @router.post(
@@ -200,17 +223,19 @@ async def restaurant_fix(request: RestaurantFixRequest):
             status_code=400,
             content={"success": False, "message": "restaurant_id is required"},
         )
-    
+
     result = await finalize_dining_session(
-        request.dining_data.dining_id, 
-        request.restaurant_id
+        request.dining_data.dining_id, request.restaurant_id
     )
-    
+
     if not result.success:
-        message = "Session not found" if result.restaurant_id == "" else "Selected restaurant is not in candidates"
-        return JSONResponse(
-            status_code=400,
-            content={"success": False, "message": message}
+        message = (
+            "Session not found"
+            if result.restaurant_id == ""
+            else "Selected restaurant is not in candidates"
         )
-    
+        return JSONResponse(
+            status_code=400, content={"success": False, "message": message}
+        )
+
     return result
