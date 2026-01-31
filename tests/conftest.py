@@ -32,3 +32,45 @@ def clean_db():
     client = MongoClient(settings.MONGODB_URI)
     client.drop_database(TEST_DB_NAME)
     client.close()
+
+
+@pytest.fixture(scope="function", autouse=True)
+def seed_restaurants(clean_db):
+    """
+    테스트용 식당 데이터를 DB에 주입합니다.
+    clean_db가 먼저 실행되어 DB를 비운 후 실행됩니다.
+    """
+    client = MongoClient(settings.MONGODB_URI)
+    db = client[TEST_DB_NAME]
+    collection = db["restaurants"]
+
+    # 1. 지리적 인덱스 생성 (필수)
+    collection.create_index([("location", "2dsphere")])
+
+    # 2. 샘플 데이터 삽입
+    # 테스트 요청 좌표: [127.1111, 37.3947]
+    sample_restaurants = [
+        {
+            "id": "rest_1",
+            "name": "Test Restaurant 1",
+            "category": "KOREAN",
+            "location": {"type": "Point", "coordinates": [127.1111, 37.3947]},
+            "score": 4.5,
+            "description": "맛있는 한식",
+            "menus": [{"title": "Kimchi Stew", "price": 10000}],
+            "images": [],
+        },
+        {
+            "id": "rest_2",
+            "name": "Test Restaurant 2",
+            "category": "WESTERN",
+            "location": {"type": "Point", "coordinates": [127.1112, 37.3948]},
+            "score": 4.0,
+            "description": "Not Bad Western",
+            "menus": [{"title": "Pasta", "price": 15000}],
+            "images": [],
+        },
+    ]
+
+    collection.insert_many(sample_restaurants)
+    client.close()
