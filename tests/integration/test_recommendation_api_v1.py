@@ -16,20 +16,28 @@ client = TestClient(app)
 from unittest.mock import AsyncMock, patch, MagicMock
 
 
-@patch("src.recommendation.router.routes_v1.persona_workflow")
-def test_update_persona_db(mock_workflow):
+@patch("src.recommendation.router.routes_v1.UsersRepository")
+@patch(
+    "src.recommendation.router.routes_v1.create_persona_description",
+    new_callable=AsyncMock,
+)
+def test_update_persona_db(mock_create_persona, MockUsersRepo):
     """
     CI용 목업 테스트: Persona 업데이트 API 호출 테스트 (CamelCase JSON 통신)
     """
-    # Mock workflow response
-    mock_final_doc = MagicMock()
-    mock_final_doc.id = 123456789
+    # 1. create_persona_description Mock 설정
+    mock_create_persona.return_value = "Mock Generated Persona Description"
 
-    # Mock return value of ainvoke
-    mock_workflow.ainvoke = AsyncMock(return_value={"final_document": mock_final_doc})
+    # 2. UsersRepository Mock 설정
+    mock_repo_instance = MockUsersRepo.return_value
+
+    # 저장 후 반환될 User 객체 Mock
+    mock_saved_user = MagicMock()
+    mock_saved_user.id = 123456789
+    # save 메서드는 async이므로 AsyncMock 설정
+    mock_repo_instance.save = AsyncMock(return_value=mock_saved_user)
 
     # Spring 방식의 camelCase JSON 요청
-    # UserDataRequest: user_data (single object), review_data (list)
     payload = {
         "userData": {
             "id": 123456789,
@@ -44,10 +52,13 @@ def test_update_persona_db(mock_workflow):
         "reviewData": [],
     }
 
+    # API 호출
     response = client.post("/ai/api/v1/update_persona_db", json=payload)
 
+    # 응답 검증
     assert response.status_code == 200
     data = response.json()
+
     # 응답도 camelCase로 오는지 확인
     assert data["success"] is True
     assert data["userId"] == 123456789
@@ -62,7 +73,7 @@ def test_health_check():
 
 def test_recommendations():
     """식당 추천 API 호출 테스트 (CamelCase JSON 통신)"""
-    test_dining_id = random.randint(1, 1000000) 
+    test_dining_id = random.randint(1, 1000000)
     payload = {
         "diningData": {
             "diningId": test_dining_id,
@@ -93,7 +104,7 @@ def test_recommendations():
 
 def test_analyze_refresh():
     """재추천 API 호출 테스트 (CamelCase JSON 통신)"""
-    test_dining_id = random.randint(1, 1000000) 
+    test_dining_id = random.randint(1, 1000000)
     setup_payload = {
         "diningData": {
             "diningId": test_dining_id,
@@ -131,7 +142,7 @@ def test_analyze_refresh():
 
 def test_restaurant_fix():
     """최종 식당 확정 API 호출 테스트"""
-    test_id = random.randint(1, 1000000) # 고유 ID 생성
+    test_id = random.randint(1, 1000000)  # 고유 ID 생성
 
     # 1. 사전 세션 생성 (Setup)
     setup_payload = {
@@ -149,7 +160,7 @@ def test_restaurant_fix():
     assert setup_res.status_code == 200
     setup_data = setup_res.json()
     real_restaurant_id = setup_data["recommendedItems"][0]["restaurantId"]
-    
+
     # 2. 결과 확정 요청
     payload = {
         "diningData": setup_payload["diningData"],
