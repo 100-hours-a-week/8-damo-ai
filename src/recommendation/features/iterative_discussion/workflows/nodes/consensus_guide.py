@@ -22,7 +22,7 @@ async def consensus_guide_node(state: Dict[str, Any]) -> Dict[str, Any]:
     round_num = state.get("round", 1)
     max_rounds = state.get("max_rounds", 3)
     messages = state.get("messages", [])
-    candidates = state.get("candidates", [])
+    candidates = state.get("filtered_restaurants", [])
     votes = state.get("votes", {})
 
     # ModeratorAgent 생성 및 합의 유도

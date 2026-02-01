@@ -4,6 +4,7 @@
 1. TOPIC_PROPOSAL_PROMPT: 라운드 시작 발제
 2. SUMMARIZE_PROMPT: 토론 내용 요약
 3. CONSENSUS_GUIDE_PROMPT: 합의 유도
+4. RANK_CANDIDATES_PROMPT: 후보 식당 순위 선정
 """
 
 from langchain_core.prompts import ChatPromptTemplate
@@ -166,6 +167,54 @@ CONSENSUS_GUIDE_PROMPT = ChatPromptTemplate.from_messages(
 
                 - 4-6문장으로 작성
                 - 따뜻하고 격려하는 톤 사용
+            """,
+        ),
+    ]
+)
+
+
+# 4. 후보 식당 순위 선정 프롬프트
+RANK_CANDIDATES_PROMPT = ChatPromptTemplate.from_messages(
+    [
+        (
+            "system",
+            """
+                당신은 멀티에이전트 토론의 **중재자(Moderator)**이자 **분석가**입니다.
+
+                [역할]
+                - 전체 토론 내용을 분석하여 후보 식당들의 최종 순위를 결정합니다.
+                - 단순한 투표 수뿐만 아니라, 토론의 맥락과 에이전트들의 선호도 강도를 반영합니다.
+                - 토론에 참여한 페르소나들이 **가장 가고 싶어하는 순서대로** 정렬합니다.
+
+                [원칙]
+                - 객관적인 분석에 기반하세요.
+                - 명시적인 지지("나는 A가 좋아")와 암묵적인 선호("B도 나쁘지 않네")를 구분하세요.
+                - 반대 의견이 많은 식당은 순위를 낮추세요.
+                - 합의된 결론이 있다면 그 식당을 1위로 선정하세요.
+            """,
+        ),
+        (
+            "human",
+            """
+                [후보 식당 목록]
+                {candidates_info}
+
+                [토론 내용 요약]
+                {discussion_summary}
+                
+                [전체 토론 로그]
+                {messages}
+
+                [요청]
+                토론 내용을 바탕으로 후보 식당들을 **선호도 순서대로** 정렬해주세요.
+
+                [출력 형식]
+                - JSON 형식으로만 응답해야 합니다.
+                - 예시:
+                {{
+                    "ranked_restaurant_ids": ["restaurant_id_1", "restaurant_id_3", "restaurant_id_2"],
+                    "reasoning": "A 식당은 모든 참여자가 동의했습니다. B 식당은 2명이 반대했습니다."
+                }}
             """,
         ),
     ]

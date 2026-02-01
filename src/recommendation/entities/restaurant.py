@@ -35,7 +35,7 @@ class RestaurantDocument(BaseModel):
     )  # DB 필드명 그대로 사용 (snake_case)
 
     # MongoDB _id는 보통 ObjectId이지만, 여기서는 편의상 str로 매핑하거나 별도 처리
-    # id: Optional[str] = Field(alias="_id", default=None)
+    id: Optional[str] = Field(alias="_id", default=None)
 
     place_name: str
     address_name: str

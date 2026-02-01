@@ -21,7 +21,7 @@ async def summarize_node(state: Dict[str, Any]) -> Dict[str, Any]:
     """
     round_num = state.get("round", 1)
     messages = state.get("messages", [])
-    candidates = state.get("candidates", [])
+    candidates = state.get("filtered_restaurants", [])
 
     # ModeratorAgent 생성 및 요약
     moderator = ModeratorAgent()

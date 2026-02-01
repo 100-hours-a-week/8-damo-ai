@@ -20,7 +20,7 @@ async def topic_proposal_node(state: Dict[str, Any]) -> Dict[str, Any]:
         발제 메시지가 추가된 상태 업데이트
     """
     round_num = state.get("round", 1)
-    candidates = state.get("candidates", [])
+    candidates = state.get("filtered_restaurants", [])
     max_rounds = state.get("max_rounds", 3)
     messages = state.get("messages", [])
 

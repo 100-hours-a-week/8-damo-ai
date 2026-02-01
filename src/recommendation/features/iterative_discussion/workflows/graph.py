@@ -87,8 +87,7 @@ async def create_discussion_graph(
     initial_state: DiscussionState = {
         "round": 0,  # initialize_state_node에서 1로 설정됨
         "messages": [],
-        "candidates": candidate_restaurants,
-        "final_candidates": [],  # 토론 후 선정됨
+        "filtered_restaurants": candidate_restaurants,
         "votes": {},
         "consensus_reached": False,
         "final_decision": None,
@@ -117,17 +116,23 @@ async def run_iterative_discussion(
     Returns:
         토론 결과 (discussion_log, final_decision, reasoning)
     """
-    # TODO: MongoDB에서 실제 식당 정보 조회
-    # 현재는 Mock 데이터 사용
-    candidate_restaurants = [
-        {
-            "id": restaurant_id,
-            "name": f"Restaurant {restaurant_id}",
-            "category": "Korean",
-            "location": "Seoul",
-        }
-        for restaurant_id in candidate_restaurant_ids
-    ]
+    # MongoDB에서 실제 식당 정보 조회
+    from ...repositories.restaurant_repository import RestaurantRepository
+
+    restaurant_repo = RestaurantRepository()
+    restaurant_docs = await restaurant_repo.find_by_ids(candidate_restaurant_ids)
+
+    candidate_restaurants = []
+    for doc in restaurant_docs:
+        candidate_restaurants.append(
+            {
+                "id": doc.id,
+                "name": doc.place_name,
+                "category": doc.category_detail or doc.category_group_name,
+                "location": doc.address_name or doc.road_address_name,
+                "menus": [m.title for m in doc.menus[:3]],  # 주요 메뉴 3개
+            }
+        )
 
     # 그래프 실행
     final_state = await create_discussion_graph(

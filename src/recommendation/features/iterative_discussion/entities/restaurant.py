@@ -67,7 +67,11 @@ def format_restaurant_for_display(restaurant: RestaurantCandidate) -> str:
     )
 
     # 거리 정보
-    distance = restaurant.get("location", {}).get("distance", 0)
+    location_val = restaurant.get("location", {})
+    if isinstance(location_val, dict):
+        distance = location_val.get("distance", 0)
+    else:
+        distance = 0
     distance_text = f"{distance}m" if distance < 1000 else f"{distance / 1000:.1f}km"
 
     # 리뷰 키워드 (상위 3개)
@@ -109,7 +113,11 @@ def format_restaurants_for_prompt(restaurants: List[RestaurantCandidate]) -> str
         address = restaurant.get("road_address_name") or restaurant.get(
             "address_name", "주소 없음"
         )
-        distance = restaurant.get("location", {}).get("distance", 0)
+        location_val = restaurant.get("location", {})
+        if isinstance(location_val, dict):
+            distance = location_val.get("distance", 0)
+        else:
+            distance = 0
         distance_text = (
             f"{distance}m" if distance < 1000 else f"{distance / 1000:.1f}km"
         )

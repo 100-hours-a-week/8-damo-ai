@@ -18,7 +18,7 @@ async def agent_discussion_node(state: Dict[str, Any]) -> Dict[str, Any]:
         에이전트 발언이 추가된 상태 업데이트
     """
     user_ids = state.get("user_ids", [])
-    candidates = state.get("candidates", [])
+    candidates = state.get("filtered_restaurants", [])
     messages = state.get("messages", [])
     round_num = state.get("round", 1)
     max_rounds = state.get("max_rounds", 3)
