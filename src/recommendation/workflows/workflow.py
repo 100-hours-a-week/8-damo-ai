@@ -1,16 +1,26 @@
 # LangGraph 기본 설정
 from langgraph.graph import StateGraph, START, END
 from langgraph.store.memory import InMemoryStore
+
 # State, Model 등 스키마 구조
 from src.recommendation.workflows.states.recommendation_state import RecommendationState
 from src.recommendation.schemas.recommendations_request import RecommendationsRequest
 from src.recommendation.schemas.recommendations_response import RecommendationsResponse
+
 # 노드
 from src.recommendation.workflows.nodes.utility_node import (
-    branch_node, error_branch_node, analyze_refresh_branch
+    branch_node,
+    error_branch_node,
+    analyze_refresh_branch,
 )
-from src.recommendation.workflows.nodes.restaurant_filtering import restaurant_filtering_node
+from src.recommendation.workflows.nodes.restaurant_filtering import (
+    restaurant_filtering_node,
+)
 from src.recommendation.workflows.nodes.analyze_refresh import analyze_refresh_node
+from src.recommendation.workflows.nodes.iterative_discussion import (
+    iterative_discussion_node,
+)
+
 # 내장 라이브러리
 from datetime import datetime
 # 서드파티 라이브러리
@@ -30,9 +40,10 @@ from datetime import datetime
 # from src.recommendation.workflows.edges.check_satisfication import check_satisfaction
 # from src.recommendation.workflows.edges.check_max_iterations import check_max_iterations
 
+
 def __initial_state(request: RecommendationsRequest) -> RecommendationState:
     is_vote_exists = request.vote_result_list is not None
-    
+
     # 초기 상태 생성
     initial_state = RecommendationState(
         user_ids=request.user_ids,
@@ -63,9 +74,9 @@ def __initial_state(request: RecommendationsRequest) -> RecommendationState:
     initial_state = {
         **initial_state,
         "is_initial_workflow": not is_vote_exists,
-        "vote_result_list": request.vote_result_list
+        "vote_result_list": request.vote_result_list,
     }
-    
+
     return initial_state
 
 
@@ -89,13 +100,37 @@ async def recommendation_workflow(request: RecommendationsRequest):
     workflow.add_node("restaurant_filtering", restaurant_filtering_node)
     workflow.add_node("analyze_refresh", analyze_refresh_node)
 
+    # 합의 과정
+    """
+    workflow.add_node(
+        "iterative_discussion",
+        iterative_discussion_node,
+        sub_graph=compile(),
+        input=lambda main_state: {
+            "user_ids": main_state["user_ids"],
+            "filtered_restaurants": main_state["filtered_restaurants"],
+            "personas": main_state["personas"],
+        },
+        output=lambda substate: {
+            "filtered_restaurants": substate["filtered_restaurants"],
+            "personas": substate["personas"],
+        },
+    )
+    """
+    workflow.add_node("iterative_discussion", iterative_discussion_node)
+
     # 4. 엣지(연결) 구조
     workflow.add_conditional_edges(
         START,
         branch_node,
-        {"restaurant_filtering": "restaurant_filtering", "analyze_refresh": "analyze_refresh"},
+        {
+            "restaurant_filtering": "restaurant_filtering",
+            "analyze_refresh": "analyze_refresh",
+        },
     )
-    workflow.add_edge("restaurant_filtering", END)
+    workflow.add_edge("restaurant_filtering", "iterative_discussion")
+    workflow.add_edge("iterative_discussion", END)
+
     workflow.add_conditional_edges(
         "analyze_refresh",
         analyze_refresh_branch,
@@ -107,4 +142,3 @@ async def recommendation_workflow(request: RecommendationsRequest):
     result_state = await app.ainvoke(initial_state)
 
     return result_state
-
