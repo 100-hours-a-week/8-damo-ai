@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field, ConfigDict
 from pydantic.alias_generators import to_camel
-from typing import List
+from typing import List, Optional
 from src.recommendation.enums import AllergyType, Gender, AgeGroup
 
 
@@ -22,9 +22,13 @@ class UserData(BaseModel):
     )
     gender: Gender = Field(..., description="성별 (MALE, FEMALE)")
     age_group: AgeGroup = Field(..., description="연령대")
-    allergies: List[AllergyType] = Field(..., description="알레르기 정보 목록")
-    like_foods: List[str] = Field(..., description="좋아하는 음식 카테고리 ID 목록")
-    like_ingredients: List[str] = Field(
-        ..., description="좋아하는 재료 카테고리 ID 목록"
+    allergies: Optional[List[AllergyType]] = Field(
+        None, description="알레르기 정보 목록"
     )
-    other_characteristics: str = Field(..., description="기타 특이사항")
+    like_foods: Optional[List[str]] = Field(
+        None, description="좋아하는 음식 카테고리 ID 목록"
+    )
+    like_ingredients: Optional[List[str]] = Field(
+        None, description="좋아하는 재료 카테고리 ID 목록"
+    )
+    other_characteristics: Optional[str] = Field(None, description="기타 특이사항")

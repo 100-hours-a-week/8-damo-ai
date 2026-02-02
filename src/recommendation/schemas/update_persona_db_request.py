@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field, ConfigDict
 from pydantic.alias_generators import to_camel
-from typing import List
+from typing import List, Optional
 from src.recommendation.schemas.user_data import UserData
 from src.recommendation.schemas.review_data import ReviewData
 
@@ -23,21 +23,23 @@ class UpdatePersonaDBRequest(BaseModel):
                     "gender": "MALE",
                     "ageGroup": "TWENTIES",
                     "allergies": ["PEANUT", "MILK"],
-                    "likeFoodCategoriesId": ["KOREAN", "CHINESE"],
-                    "categoriesId": ["KOREAN", "CHINESE", "JAPANESE"],
-                    "otherCharacteristics": "매운 것을 좋아하고 시끄러운 곳을 피합니다."
+                    "likeFoods": ["KOREAN", "CHINESE"],
+                    "likeIngredients": ["KOREAN", "CHINESE", "JAPANESE"],
+                    "otherCharacteristics": "매운 것을 좋아하고 시끄러운 곳을 피합니다.",
                 },
                 "reviewData": [
                     {
                         "restaurantId": "rest123",
                         "userId": 123456789,
                         "rating": 5,
-                        "comment": "고기가 정말 신선하고 맛있어요!"
+                        "comment": "고기가 정말 신선하고 맛있어요!",
                     }
-                ]
+                ],
             }
-        }
+        },
     )
 
     user_data: UserData = Field(..., description="업데이트할 사용자 데이터")
-    review_data: List[ReviewData] = Field(..., description="리뷰 데이터 리스트")
+    review_data: Optional[List[ReviewData]] = Field(
+        None, description="리뷰 데이터 리스트"
+    )
