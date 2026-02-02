@@ -4,6 +4,7 @@ from langgraph.store.memory import BaseStore
 from src.recommendation.workflows.states.recommendation_state import RecommendationState
 from src.shared.db.db_manager import MongoManager
 
+
 async def load_db_node(state: RecommendationState, store: BaseStore) -> str:
     try:
         namespace = ("dining_sessions", str(state["dining_id"]))
@@ -13,10 +14,18 @@ async def load_db_node(state: RecommendationState, store: BaseStore) -> str:
         data = await mongo_manager.read_one({"diningId": state["dining_id"]})
         if data == None:
             raise Exception(f"Dining session not found for ID: {state['dining_id']}")
-        
+
         store.put(namespace=namespace, key=str(state["dining_id"]), value=data)
 
         return state
+
+        """
+        return {
+            **state,
+            "iteration_count": state["iteration_count"] + 1,
+        }
+        """
+
     except Exception as e:
         print(e)
         return {

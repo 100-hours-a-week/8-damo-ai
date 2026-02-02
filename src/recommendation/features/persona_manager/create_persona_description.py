@@ -26,15 +26,11 @@ async def create_persona_description(request: UpdatePersonaDBRequest) -> str:
 
     # 2. 리스트 데이터 포맷팅
     allergies_str = ", ".join(user_data.allergies) if user_data.allergies else "없음"
-    like_foods_str = (
-        ", ".join(user_data.like_food_categories_id)
-        if user_data.like_food_categories_id
-        else "없음"
-    )
+    like_foods_str = ", ".join(user_data.like_foods) if user_data.like_foods else "없음"
     # preferred_ingredients는 UserData 모델에 없다면 적절한 필드로 매핑하거나 비워둡니다 (현재 스키마 기준).
-    # 여기서는 categories_id를 활용하거나 임시로 같은 값을 사용하겠습니다.
+    # 여기서는 like_ingredients를 활용하거나 임시로 같은 값을 사용하겠습니다.
     preferred_ingredients_str = (
-        ", ".join(user_data.categories_id) if user_data.categories_id else "없음"
+        ", ".join(user_data.like_ingredients) if user_data.like_ingredients else "없음"
     )
 
     # 3. LLM 체인 구성 및 실행

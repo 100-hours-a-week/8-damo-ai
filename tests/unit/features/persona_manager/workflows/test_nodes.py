@@ -18,8 +18,8 @@ def mock_request_data():
         gender=Gender.MALE,
         age_group=AgeGroup.TWENTIES,
         allergies=[AllergyType.PEACH],
-        like_food_categories_id=["KOREAN"],
-        categories_id=["KOREAN"],
+        like_foods=["KOREAN"],
+        like_ingredients=["KOREAN"],
         other_characteristics="Quiet atmosphere",
     )
     return UpdatePersonaDBRequest(user_data=user, review_data=[])

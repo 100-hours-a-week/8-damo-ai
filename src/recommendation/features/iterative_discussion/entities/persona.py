@@ -16,8 +16,8 @@ class PersonaDocument(BaseModel):
     gender: Gender
     age_group: AgeGroup
     allergies: List[AllergyType]
-    like_food_categories_id: List[str]
-    categories_id: List[str]
+    like_foods: List[str]
+    like_ingredients: List[str]
     other_characteristics: str
     base_persona: str
 

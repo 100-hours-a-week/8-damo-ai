@@ -24,8 +24,8 @@ async def test_save_and_find_user():
         gender=Gender.MALE,
         age_group=AgeGroup.TWENTIES,
         allergies=[AllergyType.PEACH, AllergyType.CRAB],
-        like_food_categories_id=["KOREAN"],
-        categories_id=["KOREAN"],
+        like_foods=["KOREAN"],
+        like_ingredients=["KOREAN"],
         other_characteristics="Integration Test User",
         base_persona="Friendly foodie",
     )

@@ -23,8 +23,8 @@ class UserData(BaseModel):
     gender: Gender = Field(..., description="성별 (MALE, FEMALE)")
     age_group: AgeGroup = Field(..., description="연령대")
     allergies: List[AllergyType] = Field(..., description="알레르기 정보 목록")
-    like_food_categories_id: List[str] = Field(
-        ..., description="좋아하는 음식 카테고리 ID 목록"
+    like_foods: List[str] = Field(..., description="좋아하는 음식 카테고리 ID 목록")
+    like_ingredients: List[str] = Field(
+        ..., description="좋아하는 재료 카테고리 ID 목록"
     )
-    categories_id: List[str] = Field(..., description="음식 카테고리 ID 목록")
     other_characteristics: str = Field(..., description="기타 특이사항")
