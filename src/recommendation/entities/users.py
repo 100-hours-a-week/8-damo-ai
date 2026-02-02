@@ -15,12 +15,12 @@ class Users(BaseModel):
     nickname: str
     gender: Gender
     age_group: AgeGroup
-    allergies: List[AllergyType]
-    like_foods: List[str]
-    like_ingredients: List[str]
-    other_characteristics: str
-    reviews: List[ReviewData] = Field(default_factory=list)
-    base_persona: Optional[str] = None
+    allergies: Optional[List[AllergyType]]
+    like_foods: Optional[List[str]]
+    like_ingredients: Optional[List[str]]
+    other_characteristics: Optional[str]
+    reviews: Optional[List[ReviewData]] = Field(default_factory=list)
+    base_persona: Optional[str]
 
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: datetime = Field(default_factory=datetime.now)
