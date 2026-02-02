@@ -127,7 +127,7 @@ async def recommendations(request: RecommendationsRequest):
         )
 
     mongo = MongoManager()
-    await mongo.save_dining_session(result)
+    updated_phase = await mongo.save_dining_session(result)
 
     # 상위 5개 식당 매핑
     recommended_items = []
@@ -155,7 +155,7 @@ async def recommendations(request: RecommendationsRequest):
         )
 
     return RecommendationsResponse(
-        recommendation_count=result.get("iteration_count", 0),
+        recommendation_count=updated_phase or 1,
         recommended_items=recommended_items,
     )
 
@@ -210,7 +210,7 @@ async def analyze_refresh(request: RecommendationsRequest):
         )
 
     mongo = MongoManager()
-    await mongo.save_dining_session(result)
+    updated_phase = await mongo.save_dining_session(result)
 
     # # 상위 5개 식당 매핑
     recommended_items = []
@@ -237,7 +237,7 @@ async def analyze_refresh(request: RecommendationsRequest):
         )
 
     return RecommendationsResponse(
-        recommendation_count=result.get("iteration_count", 0),
+        recommendation_count=updated_phase or 0,
         recommended_items=recommended_items,
     )
 

@@ -165,7 +165,8 @@ class MongoManager:
                     }
 
                 await self.collection.update_one({"diningId": dining_id}, update_query)
-                await self.update_phase_count({"diningId": dining_id}, "currentPhase")
+                updated_doc = await self.update_phase_count({"diningId": dining_id}, "currentPhase")
+                return updated_doc.get("currentPhase") if updated_doc else None
             else:
                 # 없을 경우 (CREATE)
                 session_data = {
@@ -189,8 +190,7 @@ class MongoManager:
                     "updatedAt": now,
                 }
                 await self.create_one(session_data)
-
-            return True
+                return 1
         except Exception as e:
             print(f"세션 저장 중 오류 발생: {str(e)}")
             return False
