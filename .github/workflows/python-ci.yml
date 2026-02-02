@@ -16,7 +16,7 @@ env:
   INCOMING_DIR: /home/ubuntu/opt/ai-prod/incoming
 
   ARTIFACT_FILE: ai-app.tar.gz
-  DEPLOY_SCRIPT: app/scripts/deploy_bigbang.sh
+  DEPLOY_SCRIPT: scripts/deploy_bigbang.sh
 
   GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }} 
   MONGODB_URI: ${{ secrets.MONGODB_URI }}
@@ -61,23 +61,8 @@ jobs:
         set -euo pipefail
 
         rm -f "${{ env.ARTIFACT_FILE }}"
-        rm -f .env
 
-        # .env 생성
-        install -m 600 /dev/null .env
-        cat > .env <<EOF
-        GOOGLE_API_KEY=${{ secrets.GOOGLE_API_KEY }}
-        MONGODB_URI=${{ secrets.MONGODB_URI }}
-        DB_NAME=${{ secrets.DB_NAME }}
-        OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
-        LANGFUSE_SECRET_KEY=${{ secrets.LANGFUSE_SECRET_KEY }}
-        LANGFUSE_PUBLIC_KEY=${{ secrets.LANGFUSE_PUBLIC_KEY }}
-        LANGFUSE_BASE_URL=${{ secrets.LANGFUSE_BASE_URL }}
-        EOF
-
-        umask 022
         tar -czf "${{ env.ARTIFACT_FILE }}" \
-          .env \
           ecosystem.ai.config.js \
           src \
           main.py \
@@ -86,9 +71,6 @@ jobs:
           run.dev.sh \
           run.test.sh \
           pyproject.toml
-
-        chmod 644 ai-app.tar.gz
-        rm -f .env
 
 
     - name: Upload bundle to server (SCP)
@@ -128,32 +110,33 @@ jobs:
 
             ART="${{ env.INCOMING_DIR }}/${{ env.ARTIFACT_FILE }}"
             APP_DIR="${{ env.REMOTE_DIR }}/app"
+            SCRIPT="${{ env.REMOTE_DIR }}/${{ env.DEPLOY_SCRIPT }}"
 
             echo "Artifact: ${ART}"
             echo "App dir: ${APP_DIR}"
+            echo "Deploy script: ${SCRIPT}"
 
-            # 파일 존재 확인(원인 바로 보이게)
+            # 파일 존재 확인
             if [ ! -f "${ART}" ]; then
               echo "ERROR: artifact not found: ${ART}"
               ls -al "${{ env.INCOMING_DIR }}" || true
               exit 1
             fi
 
-            # app/에 tar.gz 풀기
-            tar -xzf "${ART}" -C "${APP_DIR}"
-
-            # app/ 아래에 scripts 생겼는지 확인
-            SCRIPT="${{ env.REMOTE_DIR }}/${{ env.DEPLOY_SCRIPT }}"
-            echo "Script: ${SCRIPT}"
-
+            # deploy_bigbang.sh 존재 확인
             if [ ! -f "${SCRIPT}" ]; then
               echo "ERROR: deploy script not found: ${SCRIPT}"
-              ls -al "${APP_DIR}" || true
-              echo "Listing scripts dir:"
-              ls -al "${APP_DIR}/scripts" || true
+              echo "Listing ${REMOTE_DIR}:"
+              ls -al "${{ env.REMOTE_DIR }}" || true
+              echo "Listing ${REMOTE_DIR}/scripts:"
+              ls -al "${{ env.REMOTE_DIR }}/scripts" || true
               exit 1
             fi
 
+            # app/에 tar.gz 풀기
+            tar -xzf "${ART}" -C "${APP_DIR}"
+
+            # script 실행
             chmod +x "${SCRIPT}"
             "${SCRIPT}" "${ART}"
 
