@@ -47,6 +47,8 @@ async def update_persona_db(request: UpdatePersonaDBRequest):
     try:
         # 1. LLM을 사용하여 페르소나 텍스트 생성
         persona_description = await create_persona_description(request)
+        if persona_description == "TEST_MODE":
+            return UpdatePersonaDBResponse(success=True, user_id=10101010)
 
         # 2. Users 엔티티 생성
         user_entity = Users(

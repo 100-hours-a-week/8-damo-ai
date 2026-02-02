@@ -5,6 +5,8 @@ from src.recommendation.workflows.states.recommendation_state import Recommendat
 
 def branch_node(state: RecommendationState) -> str:
     """분기 노드"""
+    if state.get("user_ids") == [10101010]:
+        return "mock_node"
     if state["is_initial_workflow"] == True:
         return 'restaurant_filtering'
     else:

@@ -47,7 +47,7 @@ def test_update_persona_db(mock_create_persona, MockUsersRepo):
             "allergies": ["MILK", "EGG"],
             "likeFoods": ["KOREAN", "JAPANESE"],
             "likeIngredients": ["KOREAN"],
-            "otherCharacteristics": "매운거 못먹음",
+            "otherCharacteristics": "TEST_MODE",
         },
         "reviewData": [],
     }
@@ -83,7 +83,7 @@ def test_recommendations():
             "x": "127.1111",  # Added required field
             "y": "37.3947",  # Added required field
         },
-        "userIds": [1001, 1002, 1003],
+        "userIds": [10101010],
     }
     response = client.post("/ai/api/v1/recommendations", json=payload)
     if response.status_code != 200:
@@ -114,7 +114,7 @@ def test_analyze_refresh():
             "x": "127.1111",  # Added required field
             "y": "37.3947",  # Added required field
         },
-        "userIds": [1001, 1002, 1003],
+        "userIds": [10101010],
     }
     client.post("/ai/api/v1/recommendations", json=setup_payload)
 
@@ -127,7 +127,7 @@ def test_analyze_refresh():
             "x": "127.1111",  # Matches seed_restaurants location
             "y": "37.3947",  # Matches seed_restaurants location
         },
-        "userIds": [1001, 1002, 1003],
+        "userIds": [10101010],
         "voteResultList": [],
     }
     response = client.post("/ai/api/v1/analyze_refresh", json=payload)

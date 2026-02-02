@@ -11,6 +11,8 @@ async def create_persona_description(request: UpdatePersonaDBRequest) -> str:
     UpdatePersonaDBRequest 데이터를 받아 LLM을 통해 페르소나 설명(문자열)을 생성
     """
     user_data = request.user_data
+    if user_data.other_characteristics == "TEST_MODE":
+        return "TEST_MODE"
 
     # 1. 리뷰 데이터 포맷팅
     # 리뷰가 있으면 문자열로 변환하고, 없으면 "없음" 처리

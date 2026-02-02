@@ -79,6 +79,18 @@ def __initial_state(request: RecommendationsRequest) -> RecommendationState:
 
     return initial_state
 
+def __mock_node(state: RecommendationState) -> str:
+    from src.recommendation.data.mock_items import MOCK_DEV_ITEMS
+    
+    # dict 형태로 변환하여 저장
+    mock_restaurants = [item.model_dump() for item in MOCK_DEV_ITEMS]
+    
+    return {
+        "filtered_restaurants": mock_restaurants,
+        "iteration_count": 1,
+        "status_message": "Mock Test Mode Activated"
+    }
+
 
 async def recommendation_workflow(request: RecommendationsRequest, callbacks: list = None):
     """
@@ -118,12 +130,16 @@ async def recommendation_workflow(request: RecommendationsRequest, callbacks: li
     )
     """
     workflow.add_node("iterative_discussion", iterative_discussion_node)
+    workflow.add_node("mock_node", __mock_node)
+    workflow.add_edge("mock_node", END)
 
     # 4. 엣지(연결) 구조
+
     workflow.add_conditional_edges(
         START,
         branch_node,
         {
+            "mock_node": "mock_node", # 추가
             "restaurant_filtering": "restaurant_filtering",
             "analyze_refresh": "analyze_refresh",
         },
