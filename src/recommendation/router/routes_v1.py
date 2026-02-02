@@ -24,6 +24,7 @@ from src.shared.database import (
 from src.recommendation.workflows.workflow import recommendation_workflow
 from src.shared.db.db_manager import MongoManager
 import asyncio
+from src.shared.llm.langfuse_handler import get_langfuse_callback, flush_langfuse, propagate_attributes
 
 router = APIRouter()
 
@@ -89,7 +90,21 @@ async def recommendations(request: RecommendationsRequest):
         )
 
     try:
-        result = await asyncio.wait_for(recommendation_workflow(request), timeout=180.0)
+        # Langfuse 핸들러 생성 (recommendation: 추천 식별자)
+        handler = get_langfuse_callback(
+            prefix="recommendation",
+            source_id=request.dining_data.dining_id
+        )
+        
+        # 세션 ID 및 유저 ID 전파 (dining_id를 user_id로 활용)
+        with propagate_attributes(
+            session_id="recommendation", 
+            user_id=str(request.dining_data.dining_id)
+        ):
+            result = await asyncio.wait_for(
+                recommendation_workflow(request, callbacks=[handler]), 
+                timeout=180.0
+            )
 
     except asyncio.TimeoutError:
         raise HTTPException(
@@ -98,6 +113,8 @@ async def recommendations(request: RecommendationsRequest):
                 "error": "추천 프로세스가 너무 오래 걸려 중단되었습니다. 잠시 후 다시 시도해주세요."
             },
         )
+    finally:
+        flush_langfuse()
 
     if result.get("is_error") == True:
         raise HTTPException(
@@ -157,7 +174,21 @@ async def analyze_refresh(request: RecommendationsRequest):
         )
 
     try:
-        result = await asyncio.wait_for(recommendation_workflow(request), timeout=180.0)
+        # Langfuse 핸들러 생성 (analyze: 재분석 식별자)
+        handler = get_langfuse_callback(
+            prefix="analyze",
+            source_id=request.dining_data.dining_id
+        )
+        
+        # 세션 ID 및 유저 ID 전파 (dining_id를 user_id로 활용)
+        with propagate_attributes(
+            session_id="analyze", 
+            user_id=str(request.dining_data.dining_id)
+        ):
+            result = await asyncio.wait_for(
+                recommendation_workflow(request, callbacks=[handler]), 
+                timeout=180.0
+            )
     except asyncio.TimeoutError:
         raise HTTPException(
             status_code=504,
@@ -165,6 +196,8 @@ async def analyze_refresh(request: RecommendationsRequest):
                 "error": "추천 프로세스가 너무 오래 걸려 중단되었습니다. 잠시 후 다시 시도해주세요."
             },
         )
+    finally:
+        flush_langfuse()
 
     if result.get("is_error") == True:
         raise HTTPException(

@@ -7,7 +7,7 @@ from src.recommendation.entities.persona import Persona
 class PersonaRepository:
     def __init__(self, db: AsyncIOMotorDatabase = None):
         self.db = db or get_db()
-        self.collection = self.db["personas"]
+        self.collection = self.db["users"]
 
     async def save(self, persona: Persona) -> bool:
         """
