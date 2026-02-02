@@ -6,7 +6,7 @@ from src.recommendation.features.persona_manager.prompts.persona_prompt import (
 from src.recommendation.schemas.update_persona_db_request import UpdatePersonaDBRequest
 
 
-async def create_persona_description(request: UpdatePersonaDBRequest) -> str:
+async def create_persona_description(request: UpdatePersonaDBRequest, callbacks: list = None) -> str:
     """
     UpdatePersonaDBRequest 데이터를 받아 LLM을 통해 페르소나 설명(문자열)을 생성
     """
@@ -49,7 +49,8 @@ async def create_persona_description(request: UpdatePersonaDBRequest) -> str:
             "preferred_ingredients": preferred_ingredients_str,
             "other_characteristics": user_data.other_characteristics,
             "reviews": reviews_str,
-        }
+        },
+        config={"callbacks": callbacks}
     )
 
     return persona_desc.strip('"')  # 혹시 모를 따옴표 제거
