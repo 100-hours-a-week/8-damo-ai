@@ -15,10 +15,10 @@ class Users(BaseModel):
     nickname: str
     gender: Gender
     age_group: AgeGroup
-    allergies: List[AllergyType]
-    like_foods: List[str]
-    like_ingredients: List[str]
-    other_characteristics: str
+    allergies: List[AllergyType] = Field(default_factory=list)
+    like_foods: List[str] = Field(default_factory=list)
+    like_ingredients: List[str] = Field(default_factory=list)
+    other_characteristics: str = ""
     reviews: List[ReviewData] = Field(default_factory=list)
     base_persona: Optional[str] = None
 

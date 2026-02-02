@@ -60,18 +60,18 @@ async def update_persona_db(request: UpdatePersonaDBRequest):
             if persona_description == "TEST_MODE":
                 return UpdatePersonaDBResponse(success=True, user_id=10101010)
 
-        # 2. Users 엔티티 생성
-        user_entity = Users(
-            **request.user_data.model_dump(),
-            reviews=request.review_data,
-            base_persona=persona_description,
-        )
+            # 2. Users 엔티티 생성
+            user_entity = Users(
+                **request.user_data.model_dump(exclude_none=True),
+                reviews=request.review_data or [],
+                base_persona=persona_description,
+            )
 
-        # 3. DB 저장
-        repo = UsersRepository()
-        saved_user = await repo.save(user_entity)
+            # 3. DB 저장
+            repo = UsersRepository()
+            saved_user = await repo.save(user_entity)
 
-        return UpdatePersonaDBResponse(success=True, user_id=saved_user.id)
+            return UpdatePersonaDBResponse(success=True, user_id=saved_user.id)
 
     except Exception as e:
         return JSONResponse(
