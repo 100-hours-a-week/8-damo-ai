@@ -80,7 +80,7 @@ def __initial_state(request: RecommendationsRequest) -> RecommendationState:
     return initial_state
 
 
-async def recommendation_workflow(request: RecommendationsRequest):
+async def recommendation_workflow(request: RecommendationsRequest, callbacks: list = None):
     """
     레스토랑 추천 워크플로우 그래프 생성
 
@@ -139,6 +139,6 @@ async def recommendation_workflow(request: RecommendationsRequest):
 
     _store = InMemoryStore()
     app = workflow.compile(store=_store)
-    result_state = await app.ainvoke(initial_state)
+    result_state = await app.ainvoke(initial_state, config={"callbacks": callbacks} if callbacks else {})
 
     return result_state

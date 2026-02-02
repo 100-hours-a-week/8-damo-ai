@@ -7,4 +7,4 @@ class Persona(BaseModel):
 
     id: int = Field(..., description="사용자 ID")
     nickname: str = Field(..., description="닉네임")
-    persona: str = Field(..., description="페르소나")
+    persona: str = Field(..., alias="basePersona", description="페르소나")

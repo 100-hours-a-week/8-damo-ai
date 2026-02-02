@@ -24,8 +24,16 @@ class RecommendationsRequest(BaseModel):
                     "x": "127.1111",
                     "y": "37.3947"
                 },
-                "userIds": [1001, 1002, 1003],
-                "voteResultList": []
+                "userIds": [9980731, 2779115, 2667650],
+                "voteResultList": [
+                    {
+                        "restaurantId": "objectId",
+                        "likeCount": 1,
+                        "dislikeCount": 2,
+                        "likedUserIds": [2779115],
+                        "dislikedUserIds": [9980731, 2667650]
+                    }
+                ]
             }
         }
     )
