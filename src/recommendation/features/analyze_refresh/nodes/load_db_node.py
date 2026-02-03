@@ -11,7 +11,7 @@ async def load_db_node(state: RecommendationState, store: BaseStore) -> str:
         # 1. 기존 데이터 가져오기
         mongo_manager = MongoManager()
         mongo_manager.set_collection("dining_sessions")
-        data = await mongo_manager.read_one({"diningId": state["dining_id"]})
+        data = await mongo_manager.read_one({"diningId": str(state["dining_id"])})
         if data == None:
             raise Exception(f"Dining session not found for ID: {state['dining_id']}")
 

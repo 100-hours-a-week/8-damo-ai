@@ -32,7 +32,7 @@ def add_status_with_time(current: List[dict], new: Union[str, dict, List[Union[s
 
 class RecommendationState(TypedDict):
     user_ids: List[int]
-    dining_id: int
+    dining_id: Union[int, str]
     dining_data: dict
     filtered_restaurants: List[dict]
     rejected_restaurants: List[dict]

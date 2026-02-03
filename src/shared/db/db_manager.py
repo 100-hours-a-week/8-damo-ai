@@ -141,6 +141,9 @@ class MongoManager:
             if dining_id is None:
                 print("세션 저장 실패: diningId를 찾을 수 없습니다.")
                 return False
+            
+            # ID 타입 일관성을 위해 문자열로 변환
+            dining_id = str(dining_id)
 
             # 문서 검색 (diningId 기준)
             existing = await self.read_one({"diningId": dining_id})

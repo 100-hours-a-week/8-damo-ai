@@ -86,7 +86,7 @@ async def create_dining_session(request: RecommendationsRequest) -> Union[str, N
     collection = db["dining_sessions"]
     
     # 0. 이미 완료된 세션인지 체크
-    existing = await collection.find_one({"diningId": request.dining_data.dining_id})
+    existing = await collection.find_one({"diningId": str(request.dining_data.dining_id)})
     if existing and existing.get("isCompleted"):
         return None  # 또는 특정 에러 처리를 위한 값
 
@@ -97,7 +97,7 @@ async def create_dining_session(request: RecommendationsRequest) -> Union[str, N
         session_data.pop("_id")
     # 2. diningId를 기준으로 매칭하여 있으면 업데이트(Replace), 없으면 인서트
     result = await collection.update_one(
-        {"diningId": request.dining_data.dining_id},
+        {"diningId": str(request.dining_data.dining_id)},
         {"$set": session_data},
         upsert=True
     )
@@ -113,7 +113,7 @@ async def get_session_by_dining_id(dining_id: str) -> Optional[DiningSession]:
     db = get_db()
     collection = db["dining_sessions"]
     
-    doc = await collection.find_one({"diningId": dining_id}) # camelCase 필드명 주의
+    doc = await collection.find_one({"diningId": str(dining_id)}) # camelCase 필드명 주의
     if doc:
         return DiningSession.model_validate(doc)
     return None
@@ -124,12 +124,12 @@ async def update_current_phase(dining_id: str) -> Optional[RecommendationsRespon
     collection = db["dining_sessions"]
     
     # 0. 이미 완료된 세션인지 체크
-    existing = await collection.find_one({"diningId": dining_id})
+    existing = await collection.find_one({"diningId": str(dining_id)})
     if existing and existing.get("isCompleted"):
         return None
 
     result = await collection.find_one_and_update(
-        {"diningId": dining_id},
+        {"diningId": str(dining_id)},
         {"$inc": {"currentPhase": 1}},
         return_document=True
     )
@@ -140,13 +140,13 @@ async def update_current_phase(dining_id: str) -> Optional[RecommendationsRespon
     return_data = DiningSession.model_validate(result)
     return to_analyze_refresh_response(return_data)
 
-async def finalize_dining_session(dining_id: int, restaurant_id: str) -> RestaurantFixResponse:
+async def finalize_dining_session(dining_id: Union[int, str], restaurant_id: str) -> RestaurantFixResponse:
     """최종 식당을 확정하고 세션을 종료 상태로 변경"""
     db = get_db()
     collection = db["dining_sessions"]
     
     # 1. 기존 세션에서 해당 식당 정보가 후보군에 있었는지 확인하여 가져오기 (데이터 정합성)
-    session_doc = await collection.find_one({"diningId": dining_id})
+    session_doc = await collection.find_one({"diningId": str(dining_id)})
     if not session_doc:
         return RestaurantFixResponse(success=False, restaurant_id="")
     
@@ -163,7 +163,7 @@ async def finalize_dining_session(dining_id: int, restaurant_id: str) -> Restaur
     
     # 3. 업데이트 수행
     await collection.update_one(
-        {"diningId": dining_id},
+        {"diningId": str(dining_id)},
         {
             "$set": {
                 "isCompleted": True,

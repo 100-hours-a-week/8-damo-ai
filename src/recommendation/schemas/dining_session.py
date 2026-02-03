@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field, ConfigDict, BeforeValidator
 from pydantic.alias_generators import to_camel
-from typing import List, Optional, Annotated
+from typing import List, Optional, Annotated, Union
 from bson import ObjectId
 from datetime import datetime
 
@@ -42,8 +42,8 @@ class DiningPhase(BaseSchema):
 
 class DiningSession(BaseSchema):
     id: Optional[PyObjectId] = Field(None, alias="_id", description="데이터베이스 고유 식별자")
-    dining_id: int = Field(..., description="회식 고유 아이디")
-    groups_id: int = Field(..., description="그룹 고유 아이디")
+    dining_id: Union[int, str] = Field(..., description="회식 고유 아이디")
+    groups_id: Union[int, str] = Field(..., description="그룹 고유 아이디")
     dining_date: datetime = Field(..., description="회식 예정 날짜")
     budget: int = Field(..., description="회식 예산 범위")
     x: str = Field(..., description="회식 장소의 경도")

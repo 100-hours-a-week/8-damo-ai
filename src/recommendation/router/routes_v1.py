@@ -223,6 +223,7 @@ async def analyze_refresh(request: RecommendationsRequest):
 
     mongo = MongoManager()
     updated_phase = await mongo.save_dining_session(result)
+    print(updated_phase)
 
     # # 상위 5개 식당 매핑
     recommended_items = []
