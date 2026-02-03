@@ -145,6 +145,14 @@ class MongoManager:
             # ID 타입 일관성을 위해 문자열로 변환
             dining_id = str(dining_id)
 
+            # 3. Pydantic 모델 리스트 처리 (MongoDB 인코딩 에러 방지)
+            if phases and isinstance(phases, list):
+                phases = [
+                    p.model_dump() if hasattr(p, "model_dump") else 
+                    (p.dict() if hasattr(p, "dict") else p) 
+                    for p in phases
+                ]
+
             # 문서 검색 (diningId 기준)
             existing = await self.read_one({"diningId": dining_id})
             now = datetime.now()
