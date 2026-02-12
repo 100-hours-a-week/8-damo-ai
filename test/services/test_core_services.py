@@ -1,24 +1,5 @@
 import pytest
-import os
 from httpx import AsyncClient, ASGITransport
-
-# 테스트 실행 시 필수 환경 변수 설정
-def set_fake_env():
-    envs = {
-        "MONGODB_URI": "mongodb://localhost:27017",
-        "DB_NAME": "damo_test",
-        "GOOGLE_API_KEY": "fake_key",
-        "OPENAI_API_KEY": "fake_key",
-        "LANGFUSE_SECRET_KEY": "fake_key",
-        "LANGFUSE_PUBLIC_KEY": "fake_key",
-        "LANGFUSE_BASE_URL": "http://localhost:3000"
-    }
-    for key, value in envs.items():
-        if key not in os.environ:
-            os.environ[key] = value
-
-set_fake_env()
-
 from services.core_service.app.main import app
 
 @pytest.fixture
@@ -29,7 +10,7 @@ def anyio_backend():
 UPDATE_PERSONA_PAYLOAD = {
     "userData": {
         "id": 123456789,
-        "nickname": "맛있는녀석들",
+        "nickname": "DAMO_TEST",
         "gender": "MALE",
         "ageGroup": "TWENTIES",
         "allergies": ["PEANUT", "MILK"],
@@ -49,14 +30,14 @@ UPDATE_PERSONA_PAYLOAD = {
 
 RESTAURANT_FIX_PAYLOAD = {
     "diningData": {
-        "diningId": 12345,
+        "diningId": 276856973458919424,
         "groupsId": 678,
         "diningDate": "2025-01-29T15:00:00",
         "budget": 100000,
         "x": "127.1111",
         "y": "37.3947"
     },
-    "restaurantId": "rest123",
+    "restaurantId": "69783c8e8f56cf41f4e93106",
     "voteResultList": [
         {
             "restaurantId": "rest123",
@@ -91,6 +72,6 @@ async def test_restaurant_fix():
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         response = await ac.post("/restaurant_fix", json=RESTAURANT_FIX_PAYLOAD)
     assert response.status_code == 200
-    # 현재 core_service 로직에서 success=False로 반환하도록 설정되어 있음 (이전 수정사항 반영)
-    assert "success" in response.json()
-    assert response.json()["restaurantId"] == "rest123"
+    res_json = response.json()
+    assert res_json["success"] is True
+    assert res_json["restaurantId"] == RESTAURANT_FIX_PAYLOAD["restaurantId"] 
