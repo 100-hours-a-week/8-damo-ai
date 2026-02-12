@@ -4,12 +4,10 @@ from shared.database.db_manager import DBManager
 from shared.logging.logger import setup_logger
 from datetime import datetime
 from bson import ObjectId
-from shared.monitoring import observe
 
 # 로거 설정
 logger = setup_logger("core_service_fix")
 
-@observe()
 async def fix_task(request: RestaurantFixRequest) -> RestaurantFixResponse:
     db_manager = DBManager()
     db_manager.set_collection("dining_sessions")

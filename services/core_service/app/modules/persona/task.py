@@ -21,9 +21,9 @@ async def analyze_persona_task(body: UpdatePersonaDBRequest, correlation_id: str
             config = {
                 "run_name": "persona-task",
                 "metadata": {
-                    "langfuse_user_id": str(body.user_data.id), 
+                    "langfuse_user_id": f"user-{str(body.user_data.id)}", 
                     "langfuse_session_id": correlation_id,  
-                    "langfuse_tags": ["persona-task"],
+                    "langfuse_tags": ["persona"],
                     "correlation_id": correlation_id
                 }
             }
