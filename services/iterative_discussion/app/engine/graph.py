@@ -1,11 +1,11 @@
 from langgraph.graph import END, StateGraph
 
 from services.iterative_discussion.app.engine.state import ConsensusState
-
-
-def _stub_node(state: ConsensusState) -> dict:
-    """Phase 2~4에서 실제 구현으로 교체될 pass-through stub."""
-    return {}
+from services.iterative_discussion.app.nodes.consensus_assessment import consensus_assessment
+from services.iterative_discussion.app.nodes.moderator_preselect import moderator_preselect
+from services.iterative_discussion.app.nodes.multi_agent_dialogue import multi_agent_dialogue
+from services.iterative_discussion.app.nodes.persona_factory import persona_factory
+from services.iterative_discussion.app.nodes.persona_voting import persona_voting
 
 
 def _should_continue(state: ConsensusState) -> str:
@@ -21,12 +21,12 @@ def build_consensus_graph() -> StateGraph:
     """5노드 flat graph를 빌드하고 컴파일된 그래프를 반환."""
     graph = StateGraph(ConsensusState)
 
-    # 노드 등록 (stub)
-    graph.add_node("persona_factory", _stub_node)
-    graph.add_node("moderator_preselect", _stub_node)
-    graph.add_node("multi_agent_dialogue", _stub_node)
-    graph.add_node("consensus_assessment", _stub_node)
-    graph.add_node("persona_voting", _stub_node)
+    # 노드 등록
+    graph.add_node("persona_factory", persona_factory)
+    graph.add_node("moderator_preselect", moderator_preselect)
+    graph.add_node("multi_agent_dialogue", multi_agent_dialogue)
+    graph.add_node("consensus_assessment", consensus_assessment)
+    graph.add_node("persona_voting", persona_voting)
 
     # 엣지: 순차 흐름
     graph.set_entry_point("persona_factory")
