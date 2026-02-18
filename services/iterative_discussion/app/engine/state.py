@@ -12,6 +12,7 @@ class ConsensusState(TypedDict):
     user_data_list: List[Dict[str, Any]]
     dining_data: Dict[str, Any]
     filtered_restaurant_ids: List[str]
+    vote_result_list: List[Dict[str, Any]]  # 재추천 시 thumbup/thumbdown (없으면 빈 리스트)
 
     # Node 1 출력
     persona_prompts: Dict[str, str]
@@ -43,6 +44,7 @@ def create_initial_state(
     dining_data: Dict[str, Any],
     filtered_restaurant_ids: List[str],
     max_rounds: int = 3,
+    vote_result_list: List[Dict[str, Any]] | None = None,
 ) -> ConsensusState:
     """초기 상태를 생성하는 팩토리 함수.
 
@@ -55,6 +57,7 @@ def create_initial_state(
         user_data_list=[],
         dining_data=dining_data,
         filtered_restaurant_ids=filtered_restaurant_ids,
+        vote_result_list=vote_result_list or [],
         persona_prompts={},
         candidate_pool=[],
         round=0,
