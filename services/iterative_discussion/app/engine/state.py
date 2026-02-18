@@ -40,16 +40,18 @@ class ConsensusState(TypedDict):
 
 def create_initial_state(
     user_ids: List[int],
-    user_data_list: List[Dict[str, Any]],
     dining_data: Dict[str, Any],
     filtered_restaurants: List[Dict[str, Any]],
     max_rounds: int = 3,
 ) -> ConsensusState:
-    """초기 상태를 생성하는 팩토리 함수"""
+    """초기 상태를 생성하는 팩토리 함수.
+
+    user_data_list는 Node 1(persona_factory)에서 DB 조회 후 채워진다.
+    """
     return ConsensusState(
         user_ids=user_ids,
         max_rounds=max_rounds,
-        user_data_list=user_data_list,
+        user_data_list=[],
         dining_data=dining_data,
         filtered_restaurants=filtered_restaurants,
         persona_prompts={},
