@@ -11,7 +11,7 @@ class ConsensusState(TypedDict):
     max_rounds: int
     user_data_list: List[Dict[str, Any]]
     dining_data: Dict[str, Any]
-    filtered_restaurants: List[Dict[str, Any]]
+    filtered_restaurant_ids: List[str]
 
     # Node 1 출력
     persona_prompts: Dict[str, str]
@@ -41,19 +41,20 @@ class ConsensusState(TypedDict):
 def create_initial_state(
     user_ids: List[int],
     dining_data: Dict[str, Any],
-    filtered_restaurants: List[Dict[str, Any]],
+    filtered_restaurant_ids: List[str],
     max_rounds: int = 3,
 ) -> ConsensusState:
     """초기 상태를 생성하는 팩토리 함수.
 
     user_data_list는 Node 1(persona_factory)에서 DB 조회 후 채워진다.
+    식당 전체 문서는 Node 2(moderator_preselect)에서 DB 조회한다.
     """
     return ConsensusState(
         user_ids=user_ids,
         max_rounds=max_rounds,
         user_data_list=[],
         dining_data=dining_data,
-        filtered_restaurants=filtered_restaurants,
+        filtered_restaurant_ids=filtered_restaurant_ids,
         persona_prompts={},
         candidate_pool=[],
         round=0,
