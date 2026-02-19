@@ -3,8 +3,8 @@ from typing import Any, Dict, List
 from langchain_core.messages import HumanMessage
 
 from shared.database.db_manager import DBManager
-from shared.monitoring.langfuse_client import get_langfuse_handler
 from services.iterative_discussion.app.engine.llm_factory import get_chat_llm
+from services.iterative_discussion.app.utils.monitoring import create_langfuse_handler
 from services.iterative_discussion.app.engine.state import ConsensusState
 
 EVOLUTION_PROMPT = """\
@@ -115,9 +115,8 @@ async def self_evolution(state: ConsensusState) -> dict:
         uid = m["user_id"]
         user_mismatches.setdefault(uid, []).append(m)
 
+    trace_id = state.get("langfuse_trace_id", "")
     llm = get_chat_llm(temperature=0.3)
-    langfuse_handler = get_langfuse_handler()
-    config = {"callbacks": [langfuse_handler]} if langfuse_handler else {}
     db = DBManager(col_name="users")
 
     for user_id, user_misses in user_mismatches.items():
@@ -135,6 +134,14 @@ async def self_evolution(state: ConsensusState) -> dict:
             persona_prediction=prediction_text,
             actual_reaction=actual_text,
         )
+
+        handler = create_langfuse_handler(
+            trace_id=trace_id,
+            name=f"evolution_{user_id}",
+            user_id=user_id,
+            metadata={"mismatch_count": len(user_misses)},
+        )
+        config = {"callbacks": [handler]} if handler else {}
 
         response = await llm.ainvoke([HumanMessage(content=prompt)], config=config)
         insight = response.content.strip()

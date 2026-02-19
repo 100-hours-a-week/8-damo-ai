@@ -2,8 +2,8 @@ from typing import Any, Dict, List
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
-from shared.monitoring.langfuse_client import get_langfuse_handler
 from services.iterative_discussion.app.engine.llm_factory import get_chat_llm
+from services.iterative_discussion.app.utils.monitoring import create_langfuse_handler
 from services.iterative_discussion.app.engine.state import ConsensusState
 from services.iterative_discussion.app.prompts.dialogue_templates import (
     DIALOGUE_USER_PROMPT,
@@ -54,8 +54,7 @@ async def multi_agent_dialogue(state: ConsensusState) -> dict:
 
     candidate_text = _format_candidate_list(candidate_pool)
     llm = get_chat_llm(temperature=0.7)
-    langfuse_handler = get_langfuse_handler()
-    config = {"callbacks": [langfuse_handler]} if langfuse_handler else {}
+    trace_id = state.get("langfuse_trace_id", "")
 
     for user_id, system_prompt in persona_prompts.items():
         nickname = id_to_nickname.get(user_id, "익명")
@@ -72,6 +71,14 @@ async def multi_agent_dialogue(state: ConsensusState) -> dict:
                 candidate_list=candidate_text,
                 previous_messages=previous_text,
             )
+
+        handler = create_langfuse_handler(
+            trace_id=trace_id,
+            name=f"dialogue_round{current_round + 1}_{nickname}",
+            user_id=user_id,
+            metadata={"round": current_round + 1, "nickname": nickname},
+        )
+        config = {"callbacks": [handler]} if handler else {}
 
         llm_messages = [
             SystemMessage(content=system_prompt),

@@ -2,6 +2,8 @@ from typing import Any, Dict, List, Optional, TypedDict
 
 from langchain_core.messages import BaseMessage
 
+from services.iterative_discussion.app.utils.monitoring import init_consensus_trace
+
 
 class ConsensusState(TypedDict):
     """협의 엔진 전용 State — shared/state 수정 없이 독립 운영"""
@@ -34,6 +36,9 @@ class ConsensusState(TypedDict):
     final_selection: List[Dict[str, Any]]
     final_decision: str
 
+    # 모니터링
+    langfuse_trace_id: str
+
     # 에러 처리
     is_error: bool
     error_message: str
@@ -51,6 +56,12 @@ def create_initial_state(
     user_data_list는 Node 1(persona_factory)에서 DB 조회 후 채워진다.
     식당 전체 문서는 Node 2(moderator_preselect)에서 DB 조회한다.
     """
+    session_id = str(dining_data.get("diningId") or dining_data.get("dining_id") or "")
+    trace_id = init_consensus_trace(
+        session_id=session_id,
+        metadata={"user_ids": user_ids, "max_rounds": max_rounds},
+    )
+
     return ConsensusState(
         user_ids=user_ids,
         max_rounds=max_rounds,
@@ -68,6 +79,7 @@ def create_initial_state(
         persona_votes=[],
         final_selection=[],
         final_decision="",
+        langfuse_trace_id=trace_id,
         is_error=False,
         error_message="",
     )
