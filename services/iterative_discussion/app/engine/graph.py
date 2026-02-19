@@ -18,6 +18,13 @@ def _after_persona_factory(state: ConsensusState) -> str:
     return "preselect"
 
 
+def _check_error(state: ConsensusState) -> str:
+    """에러 발생 시 즉시 END로 단축."""
+    if state.get("is_error"):
+        return "end"
+    return "continue"
+
+
 def _should_continue(state: ConsensusState) -> str:
     """Node 4 이후 조건부 엣지: 루프백 or 투표 진행."""
     if state.get("is_error"):
@@ -53,12 +60,26 @@ def build_consensus_graph() -> StateGraph:
         },
     )
 
-    # self_evolution → moderator_preselect
-    graph.add_edge("self_evolution", "moderator_preselect")
+    # self_evolution → 에러 체크 → moderator_preselect
+    graph.add_conditional_edges(
+        "self_evolution",
+        _check_error,
+        {"continue": "moderator_preselect", "end": END},
+    )
 
-    # 이후 순차 흐름
-    graph.add_edge("moderator_preselect", "multi_agent_dialogue")
-    graph.add_edge("multi_agent_dialogue", "consensus_assessment")
+    # moderator_preselect → 에러 체크 → multi_agent_dialogue
+    graph.add_conditional_edges(
+        "moderator_preselect",
+        _check_error,
+        {"continue": "multi_agent_dialogue", "end": END},
+    )
+
+    # multi_agent_dialogue → 에러 체크 → consensus_assessment
+    graph.add_conditional_edges(
+        "multi_agent_dialogue",
+        _check_error,
+        {"continue": "consensus_assessment", "end": END},
+    )
 
     # Node 4 → 조건부: 루프백 or Node 5
     graph.add_conditional_edges(
