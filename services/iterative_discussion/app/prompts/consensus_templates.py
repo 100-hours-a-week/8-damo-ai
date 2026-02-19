@@ -11,8 +11,9 @@ CONSENSUS_ASSESSMENT_PROMPT = """\
 
 ## 응답 규칙
 - 반드시 아래 JSON 형식으로만 응답하세요.
-- 5개 이상 합의된 식당이 있으면 `consensus_reached`를 true로 설정하세요.
-- 5개 미만이면 `consensus_reached`를 false로 설정하세요.
+- 참여자 과반수가 긍정적으로 언급한 식당이 1개라도 있으면 `consensus_reached`를 true로 설정하세요.
+- 긍정 언급이 많은 순서대로 최대 5개까지 candidates에 포함하세요.
+- 아무도 동의하는 식당이 없을 때만 `consensus_reached`를 false로 설정하세요.
 
 ```json
 {{
