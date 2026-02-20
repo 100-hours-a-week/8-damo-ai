@@ -131,7 +131,7 @@ def mock_llm():
 
 @pytest.fixture
 def mock_llm_json_consensus():
-    """합의 판정 JSON을 반환하는 Mock LLM."""
+    """합의 판정 JSON을 반환하는 Mock LLM (5개 합의)."""
     llm = MagicMock()
     json_response = """{
   "consensus_reached": true,
@@ -141,7 +141,8 @@ def mock_llm_json_consensus():
     {"restaurant_id": "r3", "place_name": "파스타하우스", "reason": "양식 선호"},
     {"restaurant_id": "r6", "place_name": "비빔밥천국", "reason": "합리적 가격"},
     {"restaurant_id": "r5", "place_name": "돈카츠전문", "reason": "일식 인기"}
-  ]
+  ],
+  "rejected": []
 }"""
 
     async def _ainvoke(messages, config=None, **kwargs):
@@ -178,7 +179,31 @@ def mock_llm_no_consensus():
     llm = MagicMock()
     json_response = """{
   "consensus_reached": false,
-  "candidates": []
+  "candidates": [],
+  "rejected": []
+}"""
+
+    async def _ainvoke(messages, config=None, **kwargs):
+        return AIMessage(content=json_response)
+
+    llm.ainvoke = AsyncMock(side_effect=_ainvoke)
+    return llm
+
+
+@pytest.fixture
+def mock_llm_partial_consensus():
+    """부분 합의 (3개) JSON을 반환하는 Mock LLM."""
+    llm = MagicMock()
+    json_response = """{
+  "consensus_reached": true,
+  "candidates": [
+    {"restaurant_id": "r1", "place_name": "스시히로", "reason": "다수 찬성"},
+    {"restaurant_id": "r2", "place_name": "김치찌개집", "reason": "한식 선호"},
+    {"restaurant_id": "r3", "place_name": "파스타하우스", "reason": "양식 선호"}
+  ],
+  "rejected": [
+    {"restaurant_id": "r4", "place_name": "짬뽕대왕", "reason": "매운 음식 거부"}
+  ]
 }"""
 
     async def _ainvoke(messages, config=None, **kwargs):

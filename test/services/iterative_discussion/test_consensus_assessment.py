@@ -6,6 +6,7 @@ import pytest
 from langchain_core.messages import AIMessage
 
 from services.iterative_discussion.app.nodes.consensus_assessment import (
+    _build_moderator_feedback,
     _format_candidate_list,
     _format_dialogue_history,
     _parse_llm_json,
@@ -177,3 +178,128 @@ class TestConsensusAssessment:
             result = await consensus_assessment(state)
 
             assert result["consensus_reached"] is False
+
+    async def test_partial_consensus_not_reached(
+        self, mock_llm_partial_consensus, sample_dialogue_history
+    ) -> None:
+        """3개만 반환하면 합의 미달."""
+        with patch(
+            "services.iterative_discussion.app.nodes.consensus_assessment.get_chat_llm",
+            return_value=mock_llm_partial_consensus,
+        ):
+            state = {
+                "candidate_pool": [
+                    {"_id": f"r{i}", "place_name": f"식당{i}", "category_detail": "한식"}
+                    for i in range(1, 8)
+                ],
+                "dialogue_history": sample_dialogue_history,
+                "round": 2,
+                "max_rounds": 3,
+                "dining_data": {"diningId": 100},
+                "langfuse_trace_id": "",
+            }
+            result = await consensus_assessment(state)
+
+            assert result["consensus_reached"] is False
+            # 3개 합의 - 1개 거부(r4) = 3개 (r4는 rejected이므로 candidates에서 제거 안 됨, r4가 candidates에 없으므로 3개 유지)
+            assert len(result["consensus_candidates"]) == 3
+
+    async def test_no_backfill_in_normal_flow(
+        self, mock_llm_partial_consensus, sample_dialogue_history
+    ) -> None:
+        """비교착 + 3개 → 보충 없이 3개 그대로."""
+        with patch(
+            "services.iterative_discussion.app.nodes.consensus_assessment.get_chat_llm",
+            return_value=mock_llm_partial_consensus,
+        ):
+            state = {
+                "candidate_pool": [
+                    {"_id": f"r{i}", "place_name": f"식당{i}", "category_detail": "한식"}
+                    for i in range(1, 8)
+                ],
+                "dialogue_history": sample_dialogue_history,
+                "round": 2,
+                "max_rounds": 3,
+                "dining_data": {"diningId": 100},
+                "langfuse_trace_id": "",
+            }
+            result = await consensus_assessment(state)
+
+            # 보충 없이 합의된 것만
+            assert len(result["consensus_candidates"]) == 3
+            reasons = [c["reason"] for c in result["consensus_candidates"]]
+            assert all("보충" not in r for r in reasons)
+
+    async def test_moderator_feedback_generated(
+        self, mock_llm_partial_consensus, sample_dialogue_history
+    ) -> None:
+        """비교착 + 미달 → moderator_feedback 비어있지 않음."""
+        with patch(
+            "services.iterative_discussion.app.nodes.consensus_assessment.get_chat_llm",
+            return_value=mock_llm_partial_consensus,
+        ):
+            state = {
+                "candidate_pool": [
+                    {"_id": f"r{i}", "place_name": f"식당{i}", "category_detail": "한식"}
+                    for i in range(1, 8)
+                ],
+                "dialogue_history": sample_dialogue_history,
+                "round": 2,
+                "max_rounds": 3,
+                "dining_data": {"diningId": 100},
+                "langfuse_trace_id": "",
+            }
+            result = await consensus_assessment(state)
+
+            assert result["moderator_feedback"] != ""
+            assert "사회자 정리" in result["moderator_feedback"]
+            assert "추가 합의가 필요" in result["moderator_feedback"]
+
+    async def test_moderator_feedback_empty_on_consensus(
+        self, mock_llm_json_consensus, sample_dialogue_history
+    ) -> None:
+        """5개 합의 → moderator_feedback 빈 문자열."""
+        with patch(
+            "services.iterative_discussion.app.nodes.consensus_assessment.get_chat_llm",
+            return_value=mock_llm_json_consensus,
+        ):
+            state = {
+                "candidate_pool": [
+                    {"_id": "r1", "place_name": "스시히로", "category_detail": "일식"},
+                ],
+                "dialogue_history": sample_dialogue_history,
+                "round": 2,
+                "max_rounds": 3,
+                "dining_data": {"diningId": 100},
+                "langfuse_trace_id": "",
+            }
+            result = await consensus_assessment(state)
+
+            assert result["consensus_reached"] is True
+            assert result["moderator_feedback"] == ""
+
+    async def test_deadlock_forces_backfill(
+        self, mock_llm_partial_consensus, sample_dialogue_history
+    ) -> None:
+        """교착 시에만 보충 선정."""
+        with patch(
+            "services.iterative_discussion.app.nodes.consensus_assessment.get_chat_llm",
+            return_value=mock_llm_partial_consensus,
+        ):
+            candidate_pool = [
+                {"_id": f"r{i}", "place_name": f"식당{i}", "category_detail": "한식"}
+                for i in range(1, 8)
+            ]
+            state = {
+                "candidate_pool": candidate_pool,
+                "dialogue_history": sample_dialogue_history,
+                "round": 3,
+                "max_rounds": 3,
+                "dining_data": {"diningId": 100},
+                "langfuse_trace_id": "",
+            }
+            result = await consensus_assessment(state)
+
+            assert result["consensus_reached"] is True
+            assert len(result["consensus_candidates"]) == 5
+            assert result["rejected_restaurant_ids"] == ["r4"]

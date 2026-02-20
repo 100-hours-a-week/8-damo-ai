@@ -88,7 +88,8 @@ class TestTallyVotes:
         pool = [{"_id": "r1", "score": 0.5}]
 
         result = _tally_votes(all_votes, candidates, pool)
-        assert result[0]["approve_count"] == 0
+        # r1은 반대(1) > 찬성(0)이므로 제외되고, 보충할 항목도 없음
+        assert result == []
 
 
 @pytest.mark.asyncio
@@ -126,6 +127,8 @@ class TestPersonaVoting:
                     {"_id": "r3", "score": 0.5},
                     {"_id": "r6", "score": 0.6},
                     {"_id": "r5", "score": 0.65},
+                    {"_id": "r7", "score": 0.4},  # 보충용
+                    {"_id": "r8", "score": 0.3},  # 보충용
                 ],
                 "user_data_list": sample_user_data_list,
                 "dining_data": {"diningId": 100},

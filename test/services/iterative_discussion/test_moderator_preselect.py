@@ -145,6 +145,40 @@ class TestModeratorPreselect:
             assert len(result["candidate_pool"]) == 10
             assert all("score" in r for r in result["candidate_pool"])
 
+    async def test_rejected_restaurants_excluded(
+        self, sample_restaurant_docs, sample_user_data_list, sample_restaurant_ids
+    ) -> None:
+        """rejected_restaurant_ids에 포함된 식당은 candidate_pool에서 제외된다."""
+        restaurant_map = {r["_id"]: r for r in sample_restaurant_docs}
+
+        async def _read_all(query):
+            ids = query.get("_id", {}).get("$in", [])
+            return [dict(restaurant_map[rid]) for rid in ids if rid in restaurant_map]
+
+        mock_db = MagicMock()
+        mock_db.read_all = AsyncMock(side_effect=_read_all)
+
+        with patch(
+            "services.iterative_discussion.app.nodes.moderator_preselect.DBManager",
+            return_value=mock_db,
+        ), patch(
+            "services.iterative_discussion.app.nodes.moderator_preselect.ObjectId",
+            side_effect=lambda x: x,
+        ):
+            state = {
+                "filtered_restaurant_ids": sample_restaurant_ids,
+                "user_data_list": sample_user_data_list,
+                "rejected_restaurant_ids": ["r1", "r4"],
+            }
+            result = await moderator_preselect(state)
+
+            assert "is_error" not in result
+            candidate_ids = [str(r.get("_id", "")) for r in result["candidate_pool"]]
+            assert "r1" not in candidate_ids
+            assert "r4" not in candidate_ids
+            # rejected_restaurant_ids가 초기화되었는지 확인
+            assert result["rejected_restaurant_ids"] == []
+
     async def test_db_returns_no_restaurants(
         self, sample_user_data_list
     ) -> None:
