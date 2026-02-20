@@ -48,11 +48,15 @@ def _tally_votes(
     all_votes: List[Dict[str, Any]],
     consensus_candidates: List[Dict[str, Any]],
     candidate_pool: List[Dict[str, Any]],
+    rejected_restaurant_ids: List[str] | None = None,
 ) -> List[Dict[str, Any]]:
-    """투표 집계 → 승인수 + 초기점수 기반 최종 정렬.
+    """투표 집계 → 반대 > 찬성인 식당 제외 → 보충 → 최종 정렬.
+
+    Args:
+        rejected_restaurant_ids: 토론 단계에서 부정적으로 언급된 식당 ID 목록.
 
     Returns:
-        정렬된 최종 Top 5 리스트 (approve_count, initial_score 포함).
+        정렬된 최종 Top 5 리스트 (approve_count, reject_count, initial_score 포함).
     """
     # 초기 점수 매핑: restaurant_id → score (candidate_pool에서)
     score_map: Dict[str, float] = {}
@@ -60,25 +64,60 @@ def _tally_votes(
         rid = str(r.get("_id", ""))
         score_map[rid] = r.get("score", 0.0)
 
-    # 식당별 승인수 집계
+    # 토론에서 거부된 식당 ID
+    dialogue_rejected: set[str] = set(rejected_restaurant_ids or [])
+
+    # 식당별 찬성/반대 집계
     approve_counts: Dict[str, int] = {}
+    reject_counts: Dict[str, int] = {}
     for vote_entry in all_votes:
         for vote in vote_entry.get("votes", []):
             rid = vote.get("restaurant_id", "")
             if vote.get("approve", False):
                 approve_counts[rid] = approve_counts.get(rid, 0) + 1
+            else:
+                reject_counts[rid] = reject_counts.get(rid, 0) + 1
 
-    # 최종 정렬
+    # 반대 > 찬성인 식당 제외, 나머지만 결과에 추가
     results: List[Dict[str, Any]] = []
     for c in consensus_candidates:
         rid = c.get("restaurant_id", "")
+        approves = approve_counts.get(rid, 0)
+        rejects = reject_counts.get(rid, 0)
+        if rejects > approves:
+            continue
         results.append({
             "restaurant_id": rid,
             "place_name": c.get("place_name", ""),
-            "approve_count": approve_counts.get(rid, 0),
+            "approve_count": approves,
+            "reject_count": rejects,
             "initial_score": score_map.get(rid, 0.0),
             "reason": c.get("reason", ""),
         })
+
+    # 5개 미만이면 candidate_pool에서 초기 점수 순으로 보충
+    if len(results) < 5:
+        existing_ids = {r["restaurant_id"] for r in results}
+        # 투표 반대 + 토론 거부 식당 모두 제외
+        vote_rejected = {
+            rid for rid, cnt in reject_counts.items()
+            if cnt > approve_counts.get(rid, 0)
+        }
+        excluded_ids = existing_ids | vote_rejected | dialogue_rejected
+        for r in candidate_pool:
+            if len(results) >= 5:
+                break
+            rid = str(r.get("_id", ""))
+            if rid not in excluded_ids:
+                results.append({
+                    "restaurant_id": rid,
+                    "place_name": r.get("place_name", ""),
+                    "approve_count": 0,
+                    "reject_count": 0,
+                    "initial_score": score_map.get(rid, 0.0),
+                    "reason": "보충 선정 — 초기 점수 기반",
+                })
+                excluded_ids.add(rid)
 
     results.sort(key=lambda x: (x["approve_count"], x["initial_score"]), reverse=True)
     return results
@@ -156,8 +195,11 @@ async def persona_voting(state: ConsensusState) -> dict:
             "votes": votes,
         })
 
-    # 집계 + 정렬
-    final_selection = _tally_votes(all_votes, consensus_candidates, candidate_pool)
+    # 집계 + 정렬 (토론 단계 거부 목록 반영)
+    rejected_restaurant_ids = state.get("rejected_restaurant_ids", [])
+    final_selection = _tally_votes(
+        all_votes, consensus_candidates, candidate_pool, rejected_restaurant_ids,
+    )
 
     # 최종 결정 요약
     if final_selection:

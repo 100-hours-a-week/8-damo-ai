@@ -48,6 +48,47 @@ def _parse_llm_json(text: str) -> Dict[str, Any]:
         return {}
 
 
+def _build_moderator_feedback(
+    candidates: List[Dict[str, Any]],
+    rejected: List[Dict[str, Any]],
+    candidate_pool: List[Dict[str, Any]],
+    target_count: int = 5,
+) -> str:
+    """합의 미달 시 사회자 피드백을 생성한다 (LLM 호출 없음)."""
+    agreed_names = [c.get("place_name", "?") for c in candidates]
+    rejected_ids = {r.get("restaurant_id", "") for r in rejected}
+    agreed_ids = {c.get("restaurant_id", "") for c in candidates}
+    excluded_ids = agreed_ids | rejected_ids
+
+    # 아직 충분히 논의되지 않은 후보
+    undiscussed = [
+        r.get("place_name", "?")
+        for r in candidate_pool
+        if str(r.get("_id", "")) not in excluded_ids
+    ]
+
+    need = target_count - len(candidates)
+    lines = ["[사회자 정리]"]
+    if agreed_names:
+        lines.append(
+            f"- 현재까지 합의된 식당: {', '.join(agreed_names)} ({len(agreed_names)}개)"
+        )
+    else:
+        lines.append("- 현재까지 합의된 식당이 없습니다.")
+    lines.append(f"- {need}개 식당에 대한 추가 합의가 필요합니다.")
+    if undiscussed:
+        lines.append(
+            f"- 아직 충분히 논의되지 않은 후보: {', '.join(undiscussed[:5])}"
+        )
+    if rejected:
+        rejected_names = [r.get("place_name", "?") for r in rejected]
+        lines.append(
+            f"- 거부된 식당: {', '.join(rejected_names)} → 새로운 후보로 교체됩니다."
+        )
+    lines.append("- 다음 라운드에서 위 식당들에 대해 더 구체적으로 논의해주세요.")
+    return "\n".join(lines)
+
+
 async def consensus_assessment(state: ConsensusState) -> dict:
     """Node 4: 합의 도달 여부 판정 + 교착 시 강제 선정."""
     candidate_pool = state.get("candidate_pool", [])
@@ -108,21 +149,51 @@ async def consensus_assessment(state: ConsensusState) -> dict:
 
     consensus_reached = parsed.get("consensus_reached", False)
     candidates = parsed.get("candidates", [])
+    rejected = parsed.get("rejected", [])
+
+    # 토론에서 거부된 식당 ID 목록
+    rejected_ids = [r.get("restaurant_id", "") for r in rejected]
 
     # 교착 상태에서는 무조건 합의 처리
     if is_deadlock:
         consensus_reached = True
-        if not candidates:
-            candidates = [
-                {
-                    "restaurant_id": str(r.get("_id", "")),
+
+    # candidates에서 거부 목록에 포함된 식당 제거
+    candidates = [
+        c for c in candidates
+        if c.get("restaurant_id", "") not in rejected_ids
+    ]
+
+    # 강화된 합의 기준: 5개 이상이어야 합의 도달 (교착 시 제외)
+    if not is_deadlock and len(candidates) < 5:
+        consensus_reached = False
+
+    # 교착 시에만 보충 (일반 흐름에서는 보충하지 않음)
+    if is_deadlock and len(candidates) < 5:
+        existing_ids = {c.get("restaurant_id", "") for c in candidates}
+        excluded_ids = existing_ids | set(rejected_ids)
+        for r in candidate_pool:
+            if len(candidates) >= 5:
+                break
+            rid = str(r.get("_id", ""))
+            if rid not in excluded_ids:
+                candidates.append({
+                    "restaurant_id": rid,
                     "place_name": r.get("place_name", ""),
-                    "reason": "교착 해소 — 초기 점수 기반 선정",
-                }
-                for r in candidate_pool[:5]
-            ]
+                    "reason": "초기 점수 기반 보충 선정",
+                })
+                excluded_ids.add(rid)
+
+    # 합의 미달 시 사회자 피드백 생성
+    moderator_feedback = ""
+    if not consensus_reached and not is_deadlock:
+        moderator_feedback = _build_moderator_feedback(
+            candidates, rejected, candidate_pool,
+        )
 
     return {
         "consensus_reached": consensus_reached,
         "consensus_candidates": candidates,
+        "rejected_restaurant_ids": rejected_ids,
+        "moderator_feedback": moderator_feedback,
     }

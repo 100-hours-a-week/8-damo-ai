@@ -25,12 +25,26 @@ def _check_error(state: ConsensusState) -> str:
     return "continue"
 
 
+def _after_dialogue(state: ConsensusState) -> str:
+    """Node 3 이후: min_rounds 미달 시 합의 판정 스킵."""
+    if state.get("is_error"):
+        return "end"
+    current_round = state.get("round", 0)
+    min_rounds = state.get("min_rounds", 2)
+    if current_round < min_rounds:
+        return "dialogue"  # 합의 판정 건너뛰고 바로 다음 라운드
+    return "assess"  # 합의 판정으로
+
+
 def _should_continue(state: ConsensusState) -> str:
     """Node 4 이후 조건부 엣지: 루프백 or 투표 진행."""
     if state.get("is_error"):
         return "end"
     if state.get("consensus_reached") or state.get("round", 0) >= state.get("max_rounds", 3):
         return "vote"
+    # 거부된 식당이 있으면 → preselect로 돌아가서 후보 교체
+    if state.get("rejected_restaurant_ids"):
+        return "preselect"
     return "dialogue"
 
 
@@ -74,11 +88,15 @@ def build_consensus_graph() -> StateGraph:
         {"continue": "multi_agent_dialogue", "end": END},
     )
 
-    # multi_agent_dialogue → 에러 체크 → consensus_assessment
+    # multi_agent_dialogue → min_rounds 체크 → 스킵 or 합의 판정
     graph.add_conditional_edges(
         "multi_agent_dialogue",
-        _check_error,
-        {"continue": "consensus_assessment", "end": END},
+        _after_dialogue,
+        {
+            "dialogue": "multi_agent_dialogue",  # min_rounds 미달 → 스킵
+            "assess": "consensus_assessment",  # min_rounds 충족 → 판정
+            "end": END,
+        },
     )
 
     # Node 4 → 조건부: 루프백 or Node 5
@@ -87,6 +105,7 @@ def build_consensus_graph() -> StateGraph:
         _should_continue,
         {
             "dialogue": "multi_agent_dialogue",
+            "preselect": "moderator_preselect",
             "vote": "persona_voting",
             "end": END,
         },

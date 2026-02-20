@@ -8,6 +8,7 @@ from services.iterative_discussion.app.engine.state import ConsensusState
 from services.iterative_discussion.app.prompts.dialogue_templates import (
     DIALOGUE_USER_PROMPT,
     FIRST_ROUND_USER_PROMPT,
+    GUIDED_ROUND_USER_PROMPT,
 )
 
 
@@ -56,13 +57,33 @@ async def multi_agent_dialogue(state: ConsensusState) -> dict:
     llm = get_chat_llm(temperature=0.7)
     trace_id = state.get("langfuse_trace_id", "")
 
+    # 사회자 피드백이 있으면 dialogue_history에 추가
+    moderator_feedback = state.get("moderator_feedback", "")
+    if moderator_feedback:
+        dialogue_history.append({
+            "user_id": "moderator",
+            "nickname": "사회자",
+            "round": current_round + 1,
+            "content": moderator_feedback,
+        })
+        messages.append(AIMessage(
+            content=f"[사회자]: {moderator_feedback}",
+            name="moderator",
+        ))
+
     for user_id, system_prompt in persona_prompts.items():
         nickname = id_to_nickname.get(user_id, "익명")
         previous_text = _format_previous_messages(dialogue_history)
 
-        # 첫 라운드 & 첫 발언자는 별도 프롬프트
-        is_first = current_round == 0 and not dialogue_history
-        if is_first:
+        # 프롬프트 분기: 사회자 피드백 > 첫 라운드 > 일반
+        is_first = current_round == 0 and len(dialogue_history) == 0
+        if moderator_feedback:
+            user_prompt = GUIDED_ROUND_USER_PROMPT.format(
+                candidate_list=candidate_text,
+                previous_messages=previous_text,
+                moderator_feedback=moderator_feedback,
+            )
+        elif is_first:
             user_prompt = FIRST_ROUND_USER_PROMPT.format(
                 candidate_list=candidate_text,
             )
@@ -101,4 +122,5 @@ async def multi_agent_dialogue(state: ConsensusState) -> dict:
         "round": current_round + 1,
         "messages": messages,
         "dialogue_history": dialogue_history,
+        "moderator_feedback": "",  # 소비 후 초기화
     }

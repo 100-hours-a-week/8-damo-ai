@@ -11,6 +11,7 @@ async def moderator_preselect(state: ConsensusState) -> dict:
     """Node 2: 식당 ID로 DB 조회 → 점수 기반 Top 10 선별."""
     restaurant_ids = state.get("filtered_restaurant_ids", [])
     user_data_list = state.get("user_data_list", [])
+    rejected_ids = set(state.get("rejected_restaurant_ids", []))
 
     if not restaurant_ids:
         return {
@@ -40,6 +41,10 @@ async def moderator_preselect(state: ConsensusState) -> dict:
         if "_id" in r:
             r["_id"] = str(r["_id"])
 
+    # 거부된 식당 제외
+    if rejected_ids:
+        restaurants = [r for r in restaurants if str(r.get("_id", "")) not in rejected_ids]
+
     # 점수 기반 Top 10 선별
     candidate_pool = rank_restaurants(
         restaurants=restaurants,
@@ -47,4 +52,4 @@ async def moderator_preselect(state: ConsensusState) -> dict:
         top_k=10,
     )
 
-    return {"candidate_pool": candidate_pool}
+    return {"candidate_pool": candidate_pool, "rejected_restaurant_ids": []}
