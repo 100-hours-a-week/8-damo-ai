@@ -1,8 +1,15 @@
+import os
 from typing import Any, Dict
 
 from langfuse import Langfuse
 from langfuse.langchain import CallbackHandler
 from shared.utils.config import settings
+
+# Langfuse CallbackHandler는 os.environ에서 키를 읽지만,
+# pydantic-settings는 .env를 os.environ에 설정하지 않으므로 직접 주입
+os.environ.setdefault("LANGFUSE_PUBLIC_KEY", settings.LANGFUSE_PUBLIC_KEY)
+os.environ.setdefault("LANGFUSE_SECRET_KEY", settings.LANGFUSE_SECRET_KEY)
+os.environ.setdefault("LANGFUSE_HOST", settings.LANGFUSE_BASE_URL)
 
 
 def init_consensus_trace(
@@ -43,7 +50,5 @@ def create_langfuse_handler(
 
     return CallbackHandler(
         public_key=settings.LANGFUSE_PUBLIC_KEY,
-        secret_key=settings.LANGFUSE_SECRET_KEY,
-        host=settings.LANGFUSE_BASE_URL,
         trace_context={"trace_id": trace_id},
     )
