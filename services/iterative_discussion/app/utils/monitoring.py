@@ -43,5 +43,7 @@ def create_langfuse_handler(
 
     return CallbackHandler(
         public_key=settings.LANGFUSE_PUBLIC_KEY,
+        secret_key=settings.LANGFUSE_SECRET_KEY,
+        host=settings.LANGFUSE_BASE_URL,
         trace_context={"trace_id": trace_id},
     )
