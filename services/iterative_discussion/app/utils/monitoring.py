@@ -29,6 +29,22 @@ def init_consensus_trace(
     return Langfuse.create_trace_id()
 
 
+def create_graph_handler(trace_id: str = "") -> CallbackHandler | None:
+    """전체 그래프 실행을 하나의 trace로 기록하는 핸들러.
+
+    graph.ainvoke(state, config={"callbacks": [handler]})로 전달하면
+    모든 노드의 LLM 호출이 자동으로 이 trace 아래 span으로 중첩된다.
+    """
+    if not settings.LANGFUSE_PUBLIC_KEY:
+        return None
+
+    kwargs: Dict[str, Any] = {}
+    if trace_id:
+        kwargs["trace_context"] = {"trace_id": trace_id}
+
+    return CallbackHandler(**kwargs)
+
+
 def create_langfuse_handler(
     trace_id: str,
     name: str,

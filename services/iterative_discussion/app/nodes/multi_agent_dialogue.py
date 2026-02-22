@@ -1,9 +1,9 @@
-from typing import Any, Dict, List
+from typing import Any, Callable, Dict, List, Optional
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+from langchain_core.runnables import RunnableConfig
 
 from services.iterative_discussion.app.engine.llm_factory import get_chat_llm
-from services.iterative_discussion.app.utils.monitoring import create_langfuse_handler
 from services.iterative_discussion.app.engine.state import ConsensusState
 from services.iterative_discussion.app.prompts.dialogue_templates import (
     DIALOGUE_USER_PROMPT,
@@ -35,8 +35,18 @@ def _format_previous_messages(dialogue_history: List[Dict[str, Any]]) -> str:
     return "\n".join(lines)
 
 
-async def multi_agent_dialogue(state: ConsensusState) -> dict:
-    """Node 3: 각 페르소나가 1회 발언하는 토론 라운드."""
+async def multi_agent_dialogue(state: ConsensusState, config: RunnableConfig) -> dict:
+    """Node 3: 각 페르소나가 1회 발언하는 토론 라운드.
+
+    config["configurable"]["on_persona_speak"] 콜백이 있으면
+    각 페르소나 발언 직후 호출하여 실시간 스트리밍을 지원한다.
+    """
+    # 실시간 콜백 추출 (없으면 무시)
+    configurable = (config or {}).get("configurable") or {}
+    on_speak: Optional[Callable[[Dict[str, Any]], None]] = configurable.get(
+        "on_persona_speak",
+    )
+
     persona_prompts = state.get("persona_prompts", {})
     candidate_pool = state.get("candidate_pool", [])
     dialogue_history = list(state.get("dialogue_history", []))
@@ -55,21 +65,23 @@ async def multi_agent_dialogue(state: ConsensusState) -> dict:
 
     candidate_text = _format_candidate_list(candidate_pool)
     llm = get_chat_llm(temperature=0.7)
-    trace_id = state.get("langfuse_trace_id", "")
 
     # 사회자 피드백이 있으면 dialogue_history에 추가
     moderator_feedback = state.get("moderator_feedback", "")
     if moderator_feedback:
-        dialogue_history.append({
+        moderator_entry = {
             "user_id": "moderator",
             "nickname": "사회자",
             "round": current_round + 1,
             "content": moderator_feedback,
-        })
+        }
+        dialogue_history.append(moderator_entry)
         messages.append(AIMessage(
             content=f"[사회자]: {moderator_feedback}",
             name="moderator",
         ))
+        if on_speak:
+            on_speak(moderator_entry)
 
     for user_id, system_prompt in persona_prompts.items():
         nickname = id_to_nickname.get(user_id, "익명")
@@ -93,30 +105,26 @@ async def multi_agent_dialogue(state: ConsensusState) -> dict:
                 previous_messages=previous_text,
             )
 
-        handler = create_langfuse_handler(
-            trace_id=trace_id,
-            name=f"dialogue_round{current_round + 1}_{nickname}",
-            user_id=user_id,
-            metadata={"round": current_round + 1, "nickname": nickname},
-        )
-        config = {"callbacks": [handler]} if handler else {}
-
         llm_messages = [
             SystemMessage(content=system_prompt),
             HumanMessage(content=user_prompt),
         ]
 
-        response = await llm.ainvoke(llm_messages, config=config)
+        response = await llm.ainvoke(llm_messages)
         content = response.content
 
         # 대화 기록에 추가
-        dialogue_history.append({
+        entry = {
             "user_id": user_id,
             "nickname": nickname,
             "round": current_round + 1,
             "content": content,
-        })
+        }
+        dialogue_history.append(entry)
         messages.append(AIMessage(content=f"[{nickname}]: {content}", name=user_id))
+
+        if on_speak:
+            on_speak(entry)
 
     return {
         "round": current_round + 1,

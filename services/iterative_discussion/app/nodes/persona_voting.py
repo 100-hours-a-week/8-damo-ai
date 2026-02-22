@@ -5,7 +5,6 @@ from typing import Any, Dict, List
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from services.iterative_discussion.app.engine.llm_factory import get_chat_llm
-from services.iterative_discussion.app.utils.monitoring import create_langfuse_handler
 from services.iterative_discussion.app.engine.state import ConsensusState
 from services.iterative_discussion.app.prompts.voting_templates import VOTING_PROMPT
 
@@ -143,8 +142,6 @@ async def persona_voting(state: ConsensusState) -> dict:
     candidate_text = _format_candidate_list(consensus_candidates)
     dialogue_summary = _format_dialogue_summary(dialogue_history)
 
-    trace_id = state.get("langfuse_trace_id", "")
-
     llm = get_chat_llm(temperature=0.7)
 
     all_votes: List[Dict[str, Any]] = []
@@ -152,27 +149,16 @@ async def persona_voting(state: ConsensusState) -> dict:
     for user_id, system_prompt in persona_prompts.items():
         nickname = id_to_nickname.get(user_id, "익명")
 
-        handler = create_langfuse_handler(
-            trace_id=trace_id,
-            name=f"voting_{nickname}",
-            user_id=user_id,
-            metadata={"nickname": nickname},
-        )
-        config = {"callbacks": [handler]} if handler else {}
-
         user_prompt = VOTING_PROMPT.format(
             nickname=nickname,
             candidate_list=candidate_text,
             dialogue_summary=dialogue_summary,
         )
 
-        response = await llm.ainvoke(
-            [
-                SystemMessage(content=system_prompt),
-                HumanMessage(content=user_prompt),
-            ],
-            config=config,
-        )
+        response = await llm.ainvoke([
+            SystemMessage(content=system_prompt),
+            HumanMessage(content=user_prompt),
+        ])
 
         parsed = _parse_llm_json(response.content)
         votes = parsed.get("votes", [])

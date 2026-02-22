@@ -5,7 +5,6 @@ from typing import Any, Dict, List
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from services.iterative_discussion.app.engine.llm_factory import get_chat_llm
-from services.iterative_discussion.app.utils.monitoring import create_langfuse_handler
 from services.iterative_discussion.app.engine.state import ConsensusState
 from services.iterative_discussion.app.prompts.consensus_templates import (
     CONSENSUS_ASSESSMENT_PROMPT,
@@ -113,20 +112,9 @@ async def consensus_assessment(state: ConsensusState) -> dict:
             dialogue_history=dialogue_text,
         )
 
-    trace_id = state.get("langfuse_trace_id", "")
-
     llm = get_chat_llm(temperature=0.0)
-    handler = create_langfuse_handler(
-        trace_id=trace_id,
-        name=f"assessment_round{current_round}{'_deadlock' if is_deadlock else ''}",
-        metadata={"round": current_round, "is_deadlock": is_deadlock},
-    )
-    config = {"callbacks": [handler]} if handler else {}
 
-    response = await llm.ainvoke(
-        [HumanMessage(content=prompt)],
-        config=config,
-    )
+    response = await llm.ainvoke([HumanMessage(content=prompt)])
 
     parsed = _parse_llm_json(response.content)
 
