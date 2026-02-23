@@ -1,0 +1,68 @@
+services:
+  gateway:
+    build:
+      context: ./v2-gateway
+      dockerfile: ./gateway/Dockerfile
+    image: damo_ai_gateway
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./v2-gateway/.env
+    environment:
+      - SERVICE_NAME=gateway
+      - CORE_SERVICE_URL=http://core_service:8001
+      - RECOMMENDATION_URL=http://recommendation:8002
+      - ITERATIVE_DISCUSSION_URL=http://iterative_discussion:8003
+    volumes:
+      - ./v2-gateway/shared:/app/shared
+      - ./v2-gateway/gateway:/app/gateway
+    restart: always
+
+  core_service:
+    build:
+      context: ./v2-core-service
+      dockerfile: ./services/core_service/Dockerfile
+    image: damo_ai_core_service
+    ports:
+      - "8001:8001"
+    env_file:
+      - ./v2-core-service/.env
+    environment:
+      - SERVICE_NAME=core-service
+    volumes:
+      - ./v2-core-service/shared:/app/shared
+      - ./v2-core-service/services/core_service:/app/services/core_service
+    restart: always
+
+  recommendation:
+    build:
+      context: ./v2-recommendation
+      dockerfile: ./services/recommendation/Dockerfile
+    ports:
+      - "8002:8002"
+    env_file:
+      - ./v2-recommendation/.env
+    environment:
+      - SERVICE_NAME=recommendation
+    volumes:
+      - ./v2-recommendation/shared:/app/shared
+      - ./v2-recommendation/services/recommendation:/app/services/recommendation
+    restart: always
+  # iterative_discussion:
+  #   build:
+  #     context: ./v2-core-service
+  #     dockerfile: ./services/iterative_discussion/Dockerfile
+  #   ports:
+  #     - "8003:8003"
+  #   env_file:
+  #     - ./v2-gateway/.env
+  #   environment:
+  #     - SERVICE_NAME=iterative_discussion
+  #   volumes:
+  #     - ./v2-core-service/shared:/app/shared
+  #     - ./v2-core-service/services/iterative_discussion:/app/services/iterative_discussion
+  #   restart: always
+
+networks:
+  default:
+    name: damo-network
