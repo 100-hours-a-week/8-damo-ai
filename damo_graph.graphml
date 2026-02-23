@@ -1,0 +1,29 @@
+<?xml version='1.0' encoding='utf-8'?>
+<graphml xmlns="http://graphml.graphdrawing.org/xmlns" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://graphml.graphdrawing.org/xmlns http://graphml.graphdrawing.org/xmlns/1.0/graphml.xsd"><key id="d3" for="edge" attr.name="relation" attr.type="string"/>
+<key id="d2" for="node" attr.name="address" attr.type="string"/>
+<key id="d1" for="node" attr.name="category" attr.type="string"/>
+<key id="d0" for="node" attr.name="type" attr.type="string"/>
+<graph edgedefault="undirected"><node id="프리마베라">
+  <data key="d0">Menu</data>
+</node>
+<node id="스타피자">
+  <data key="d0">Menu</data>
+</node>
+<node id="디아볼라">
+  <data key="d0">Menu</data>
+</node>
+<node id="도치피자 고기리점">
+  <data key="d0">Restaurant</data>
+  <data key="d1">피자</data>
+  <data key="d2">경기 성남시 분당구 판교대장로 19</data>
+</node>
+<edge source="프리마베라" target="도치피자 고기리점">
+  <data key="d3">SERVES</data>
+</edge>
+<edge source="스타피자" target="도치피자 고기리점">
+  <data key="d3">SERVES</data>
+</edge>
+<edge source="디아볼라" target="도치피자 고기리점">
+  <data key="d3">SERVES</data>
+</edge>
+</graph></graphml>

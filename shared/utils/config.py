@@ -4,9 +4,7 @@ class Settings(BaseSettings):
     MONGODB_URI: str
     DB_NAME: str = "damo"
     GOOGLE_API_KEY: str
-    OPENAI_API_KEY: str
-    GEMINI_MODEL: str = "gemini-2.5-flash"
-    OPENAI_MODEL: str = "gpt-5-nano"
+    GEMINI_MODEL: str = "gemini-3-flash-preview"
     LANGFUSE_SECRET_KEY: str
     LANGFUSE_PUBLIC_KEY: str
     LANGFUSE_BASE_URL: str

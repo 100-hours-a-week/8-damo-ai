@@ -70,7 +70,10 @@ run_docker() {
                 idx=$((svc_choice-1))
                 img_name="damo-${SERVICES[$idx]}"
                 echo -e "${BLUE}🐳 ${SERVICES[$idx]} (Docker) 빌드 중...${NC}"
-                docker build -t $img_name -f ${DOCKERFILES[$idx]} .
+                
+                # 최상위 디렉토리의 docker-compose.dev.yml을 사용하여 특정 서비스만 빌드 및 재시작
+                docker-compose -f ../docker-compose.dev.yml up -d --build $service_name
+
                 echo -e "${GREEN}🚀 컨테이너 실행 중...${NC}"
                 docker run -it --rm -p ${PORTS[$idx]}:${PORTS[$idx]} --env-file .env $img_name
                 break

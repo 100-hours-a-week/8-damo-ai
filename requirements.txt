@@ -10,3 +10,4 @@ langfuse
 pytest
 pytest-asyncio
 httpx
+prometheus-fastapi-instrumentator

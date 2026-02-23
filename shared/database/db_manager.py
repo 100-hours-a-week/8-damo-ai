@@ -14,8 +14,12 @@ class DBManager:
         current_uri = uri or settings.MONGODB_URI
         current_db_name = db_name or settings.DB_NAME
 
-        # 1. 비동기 클라이언트 생성
-        self.client = AsyncIOMotorClient(current_uri)
+        # 1. 비동기 클라이언트 생성 (연결 타임아웃 2초로 제한)
+        self.client = AsyncIOMotorClient(
+            current_uri,
+            serverSelectionTimeoutMS=2000,
+            connectTimeoutMS=2000
+        )
         self.db = self.client[current_db_name]
         self.collection = self.db[col_name] if col_name else None
 
@@ -68,10 +72,22 @@ class DBManager:
             return None
 
     async def update_one(
-        self, filter_query: Dict[str, Any], update_data: Dict[str, Any]
+        self, filter_query: Dict[str, Any], update_data: Dict[str, Any], upsert: bool = False
     ) -> int:
         """하나의 문서 수정 ($set 연산자 사용)"""
-        result = await self.collection.update_one(filter_query, {"$set": update_data})
+        result = await self.collection.update_one(
+            filter_query, {"$set": update_data}, upsert=upsert
+        )
+        return result.modified_count
+
+    async def update_one_with_command(
+        self, filter_query: Dict[str, Any], update_command: Dict[str, Any], upsert: bool = False
+    ) -> int:
+        """
+        하나의 문서 수정 (MongoDB 연산자를 포함한 전체 명령어를 직접 전달)
+        예: {"$push": {...}}, {"$inc": {...}}
+        """
+        result = await self.collection.update_one(filter_query, update_command, upsert=upsert)
         return result.modified_count
 
     async def find_by_location(
