@@ -50,7 +50,7 @@ class TestMultiAgentDialogue:
             "round": 0,
             "user_data_list": [],
         }
-        result = await multi_agent_dialogue(state)
+        result = await multi_agent_dialogue(state, {})
         assert result["is_error"] is True
 
     async def test_round_increments(
@@ -72,7 +72,7 @@ class TestMultiAgentDialogue:
                 "dining_data": {"diningId": 100},
                 "langfuse_trace_id": "",
             }
-            result = await multi_agent_dialogue(state)
+            result = await multi_agent_dialogue(state, {})
 
             assert result["round"] == 1
             assert len(result["dialogue_history"]) == 3  # 3명의 페르소나
@@ -97,7 +97,7 @@ class TestMultiAgentDialogue:
                 "dining_data": {"diningId": 100},
                 "langfuse_trace_id": "",
             }
-            result = await multi_agent_dialogue(state)
+            result = await multi_agent_dialogue(state, {})
 
             speaker_ids = {e["user_id"] for e in result["dialogue_history"]}
             assert speaker_ids == {"1", "2", "3"}
@@ -119,7 +119,7 @@ class TestMultiAgentDialogue:
                 "dining_data": {"diningId": 100},
                 "langfuse_trace_id": "",
             }
-            await multi_agent_dialogue(state)
+            await multi_agent_dialogue(state, {})
             assert mock_llm.ainvoke.call_count == 3
 
     async def test_previous_dialogue_passed_to_later_speakers(
@@ -150,7 +150,7 @@ class TestMultiAgentDialogue:
                 "dining_data": {"diningId": 100},
                 "langfuse_trace_id": "",
             }
-            await multi_agent_dialogue(state)
+            await multi_agent_dialogue(state, {})
 
             # 첫 번째 발언자는 FIRST_ROUND_USER_PROMPT 사용
             first_user_msg = call_args_list[0][1].content
@@ -181,7 +181,7 @@ class TestMultiAgentDialogue:
                 "langfuse_trace_id": "",
                 "moderator_feedback": "[사회자 정리]\n- 2개 추가 합의 필요",
             }
-            result = await multi_agent_dialogue(state)
+            result = await multi_agent_dialogue(state, {})
 
             moderator_entries = [
                 e for e in result["dialogue_history"]
@@ -209,7 +209,7 @@ class TestMultiAgentDialogue:
                 "langfuse_trace_id": "",
                 "moderator_feedback": "사회자 피드백",
             }
-            result = await multi_agent_dialogue(state)
+            result = await multi_agent_dialogue(state, {})
 
             assert result["moderator_feedback"] == ""
 
@@ -245,7 +245,7 @@ class TestMultiAgentDialogue:
                 "langfuse_trace_id": "",
                 "moderator_feedback": "[사회자 정리]\n- 테스트 피드백",
             }
-            await multi_agent_dialogue(state)
+            await multi_agent_dialogue(state, {})
 
             # 모든 페르소나가 GUIDED_ROUND_USER_PROMPT을 사용
             for call_args in call_args_list:

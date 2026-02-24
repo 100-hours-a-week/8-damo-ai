@@ -259,5 +259,8 @@ def mock_langfuse():
     ), patch(
         "services.iterative_discussion.app.utils.monitoring.create_langfuse_handler",
         return_value=None,
+    ), patch(
+        "services.iterative_discussion.app.utils.monitoring.create_graph_handler",
+        return_value=None,
     ):
         yield
