@@ -64,7 +64,7 @@ async def multi_agent_dialogue(state: ConsensusState, config: RunnableConfig) ->
         id_to_nickname[uid] = user.get("nickname", "익명")
 
     candidate_text = _format_candidate_list(candidate_pool)
-    llm = get_chat_llm(temperature=0.7)
+    llm = get_chat_llm(temperature=0.7, local=True)
 
     # 사회자 피드백이 있으면 dialogue_history에 추가
     moderator_feedback = state.get("moderator_feedback", "")
