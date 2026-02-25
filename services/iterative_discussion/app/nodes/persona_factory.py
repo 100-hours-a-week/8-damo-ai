@@ -1,53 +1,25 @@
-import re
+import logging
 from typing import Any, Dict, List
 
 from shared.database.db_manager import DBManager
 from services.iterative_discussion.app.engine.state import ConsensusState
 from services.iterative_discussion.app.prompts.persona_templates import (
     PERSONA_SYSTEM_PROMPT,
-    SYSTEM_INSIGHT_HEADER,
 )
 
-INSIGHT_TAG_PATTERN = re.compile(r"\[System Insight]\s*(.+)")
-
-
-def _extract_insights(other_characteristics: str) -> List[str]:
-    """otherCharacteristics에서 [System Insight] 태그를 파싱."""
-    return INSIGHT_TAG_PATTERN.findall(other_characteristics)
-
-
-def _strip_insights(other_characteristics: str) -> str:
-    """[System Insight] 태그를 제거한 원본 특이사항 반환."""
-    return INSIGHT_TAG_PATTERN.sub("", other_characteristics).strip()
+logger = logging.getLogger(__name__)
 
 
 def _build_persona_prompt(user: Dict[str, Any]) -> str:
-    """단일 유저 데이터로 시스템 프롬프트 생성."""
-    other = user.get("other_characteristics") or user.get("otherCharacteristics") or ""
-
-    insights = _extract_insights(other)
-    clean_characteristics = _strip_insights(other) if insights else other
-
-    system_insight_section = ""
-    if insights:
-        bullets = "\n".join(f"- {i}" for i in insights)
-        system_insight_section = SYSTEM_INSIGHT_HEADER.format(insights=bullets)
-
+    """유저의 basePersona와 알레르기 정보로 시스템 프롬프트 생성."""
+    base_persona = user.get("basePersona") or user.get("base_persona") or ""
     allergies_raw = user.get("allergies", [])
     allergies = ", ".join(allergies_raw) if allergies_raw else "없음"
 
-    like_cats = user.get("like_food_categories_id") or user.get("likeFoodCategoriesId") or []
-    categories = user.get("categories_id") or user.get("categoriesId") or []
-
     return PERSONA_SYSTEM_PROMPT.format(
         nickname=user.get("nickname", "익명"),
-        gender=user.get("gender", "미지정"),
-        age_group=user.get("age_group") or user.get("ageGroup") or "미지정",
+        base_persona=base_persona or "정보 없음",
         allergies=allergies,
-        like_categories=", ".join(like_cats) if like_cats else "없음",
-        categories=", ".join(categories) if categories else "없음",
-        other_characteristics=clean_characteristics or "없음",
-        system_insight_section=system_insight_section,
     )
 
 
@@ -61,7 +33,11 @@ async def persona_factory(state: ConsensusState) -> dict:
     user_data_list: List[Dict[str, Any]] = []
 
     for uid in user_ids:
-        doc = await db.read_one({"id": uid})
+        try:
+            doc = await db.read_one({"id": uid})
+        except Exception:
+            logger.warning("유저 DB 조회 실패: uid=%s", uid, exc_info=True)
+            continue
         if doc:
             doc.pop("_id", None)
             user_data_list.append(doc)

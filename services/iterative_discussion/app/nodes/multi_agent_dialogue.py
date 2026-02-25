@@ -1,3 +1,4 @@
+import logging
 from typing import Any, Callable, Dict, List, Optional
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
@@ -10,6 +11,9 @@ from services.iterative_discussion.app.prompts.dialogue_templates import (
     FIRST_ROUND_USER_PROMPT,
     GUIDED_ROUND_USER_PROMPT,
 )
+
+
+logger = logging.getLogger(__name__)
 
 
 def _format_candidate_list(candidate_pool: List[Dict[str, Any]]) -> str:
@@ -83,6 +87,8 @@ async def multi_agent_dialogue(state: ConsensusState, config: RunnableConfig) ->
         if on_speak:
             on_speak(moderator_entry)
 
+    initial_history_len = len(dialogue_history)
+
     for user_id, system_prompt in persona_prompts.items():
         nickname = id_to_nickname.get(user_id, "익명")
         previous_text = _format_previous_messages(dialogue_history)
@@ -110,7 +116,11 @@ async def multi_agent_dialogue(state: ConsensusState, config: RunnableConfig) ->
             HumanMessage(content=user_prompt),
         ]
 
-        response = await llm.ainvoke(llm_messages)
+        try:
+            response = await llm.ainvoke(llm_messages)
+        except Exception:
+            logger.warning("LLM 호출 실패: user_id=%s", user_id, exc_info=True)
+            continue
         content = response.content
 
         # 대화 기록에 추가
@@ -125,6 +135,10 @@ async def multi_agent_dialogue(state: ConsensusState, config: RunnableConfig) ->
 
         if on_speak:
             on_speak(entry)
+
+    new_entries = len(dialogue_history) - initial_history_len
+    if new_entries == 0:
+        return {"is_error": True, "error_message": "모든 페르소나 LLM 호출이 실패했습니다."}
 
     return {
         "round": current_round + 1,

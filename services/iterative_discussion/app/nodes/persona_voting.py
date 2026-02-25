@@ -1,4 +1,5 @@
 import json
+import logging
 import re
 from typing import Any, Dict, List
 
@@ -7,6 +8,9 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from services.iterative_discussion.app.engine.llm_factory import get_chat_llm
 from services.iterative_discussion.app.engine.state import ConsensusState
 from services.iterative_discussion.app.prompts.voting_templates import VOTING_PROMPT
+
+
+logger = logging.getLogger(__name__)
 
 
 def _format_candidate_list(candidates: List[Dict[str, Any]]) -> str:
@@ -155,15 +159,19 @@ async def persona_voting(state: ConsensusState) -> dict:
             dialogue_summary=dialogue_summary,
         )
 
-        response = await llm.ainvoke([
-            SystemMessage(content=system_prompt),
-            HumanMessage(content=user_prompt),
-        ])
+        try:
+            response = await llm.ainvoke([
+                SystemMessage(content=system_prompt),
+                HumanMessage(content=user_prompt),
+            ])
+        except Exception:
+            logger.warning("투표 LLM 호출 실패: user_id=%s", user_id, exc_info=True)
+            votes = []
+        else:
+            parsed = _parse_llm_json(response.content)
+            votes = parsed.get("votes", [])
 
-        parsed = _parse_llm_json(response.content)
-        votes = parsed.get("votes", [])
-
-        # 파싱 실패 시 전부 찬성으로 fallback
+        # 파싱 실패 또는 LLM 호출 실패 시 전부 찬성으로 fallback
         if not votes:
             votes = [
                 {

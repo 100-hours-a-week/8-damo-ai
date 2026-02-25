@@ -1,4 +1,5 @@
 import json
+import logging
 import re
 from typing import Any, Dict, List
 
@@ -10,6 +11,9 @@ from services.iterative_discussion.app.prompts.consensus_templates import (
     CONSENSUS_ASSESSMENT_PROMPT,
     DEADLOCK_RESOLUTION_PROMPT,
 )
+
+
+logger = logging.getLogger(__name__)
 
 
 def _format_candidate_list(candidate_pool: List[Dict[str, Any]]) -> str:
@@ -114,9 +118,13 @@ async def consensus_assessment(state: ConsensusState) -> dict:
 
     llm = get_chat_llm(temperature=0.0)
 
-    response = await llm.ainvoke([HumanMessage(content=prompt)])
-
-    parsed = _parse_llm_json(response.content)
+    try:
+        response = await llm.ainvoke([HumanMessage(content=prompt)])
+    except Exception:
+        logger.warning("합의 판정 LLM 호출 실패", exc_info=True)
+        parsed = {}
+    else:
+        parsed = _parse_llm_json(response.content)
 
     if not parsed:
         # JSON 파싱 실패 시: 교착이면 강제 합의, 아니면 루프 계속

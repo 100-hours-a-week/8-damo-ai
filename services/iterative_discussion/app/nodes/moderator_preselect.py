@@ -1,3 +1,4 @@
+import logging
 from typing import Any, Dict, List
 
 from bson import ObjectId
@@ -5,6 +6,9 @@ from bson import ObjectId
 from shared.database.db_manager import DBManager
 from services.iterative_discussion.app.engine.state import ConsensusState
 from services.iterative_discussion.app.utils.scoring import rank_restaurants
+
+
+logger = logging.getLogger(__name__)
 
 
 async def moderator_preselect(state: ConsensusState) -> dict:
@@ -27,8 +31,12 @@ async def moderator_preselect(state: ConsensusState) -> dict:
 
     # DB에서 식당 전체 문서 조회
     db = DBManager(col_name="restaurants")
-    object_ids = [ObjectId(rid) for rid in restaurant_ids]
-    restaurants: List[Dict[str, Any]] = await db.read_all({"_id": {"$in": object_ids}})
+    try:
+        object_ids = [ObjectId(rid) for rid in restaurant_ids]
+        restaurants: List[Dict[str, Any]] = await db.read_all({"_id": {"$in": object_ids}})
+    except Exception as exc:
+        logger.warning("식당 DB 조회 실패", exc_info=True)
+        return {"is_error": True, "error_message": f"식당 DB 조회 실패: {exc}"}
 
     if not restaurants:
         return {

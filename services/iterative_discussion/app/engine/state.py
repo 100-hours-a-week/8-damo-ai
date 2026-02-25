@@ -11,11 +11,13 @@ class ConsensusState(TypedDict):
     # 입력
     user_ids: List[int]
     max_rounds: int
-    min_rounds: int  # 최소 토론 라운드 수 (기본 2)
+    min_rounds: int  # 최소 토론 라운드 수
     user_data_list: List[Dict[str, Any]]
     dining_data: Dict[str, Any]
     filtered_restaurant_ids: List[str]
-    vote_result_list: List[Dict[str, Any]]  # 재추천 시 thumbup/thumbdown (없으면 빈 리스트)
+    vote_result_list: List[
+        Dict[str, Any]
+    ]  # (미사용 — 진화 로직 외부 이관) 재추천 시 thumbup/thumbdown
 
     # Node 1 출력
     persona_prompts: Dict[str, str]
