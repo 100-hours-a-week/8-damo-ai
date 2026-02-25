@@ -7,23 +7,24 @@ from bson import ObjectId
 
 class EventType(str, Enum):
     RECOMMENDATION_REQUEST = "RECOMMENDATION_REQUEST"
-    RECOMMENDATION_STREAMING = "RECOMMENDATION_STREAMING"
     RECOMMENDATION_RESPONSE = "RECOMMENDATION_RESPONSE"
-    RECOMMENDATION_RETRY = "RECOMMENDATION_RETRY"
-    PERSONA_REQUEST = "PERSONA_REQUEST"
-    OCR_REQUEST = "OCR_REQUEST"
-    OCR_RESPONSE = "OCR_RESPONSE"
-    FIX_REQUEST = "FIX_REQUEST"
+    RECOMMENDATION_REFRESH_REQUEST = "RECOMMENDATION_REFRESH_REQUEST"
+    RECOMMENDATION_STREAMING = "RECOMMENDATION_STREAMING"
+    RESTAURANT_CONFIRMED = "RESTAURANT_CONFIRMED"
+    USER_PERSONA_UPDATE = "USER_PERSONA_UPDATE"
+    RECEIPT_OCR_REQUEST = "RECEIPT_OCR_REQUEST"
+    RECEIPT_OCR_RESPONSE = "RECEIPT_OCR_RESPONSE"
 
 class TopicType(str, Enum):
     RECOMMENDATION_REQUEST = "recommendation-request"
-    RECOMMENDATION_STREAMING = "recommendation-streaming"
     RECOMMENDATION_RESPONSE = "recommendation-response"
-    RECOMMENDATION_RETRY = "recommendation-retry"
-    PERSONA_REQUEST = "user-persona-update"
-    OCR_REQUEST = "ocr-request"
-    OCR_RESPONSE = "ocr-response"
-    FIX_REQUEST = "fix-request"
+    RECOMMENDATION_REFRESH_REQUEST = "recommendation-refresh-request"
+    RECOMMENDATION_STREAMING = "recommendation-streaming"
+    RESTAURANT_CONFIRMED = "restaurant-confirmed"
+    USER_PERSONA_UPDATE = "user-persona-update"
+    RECEIPT_OCR_REQUEST = "receipt-ocr-request"
+    RECEIPT_OCR_RESPONSE = "receipt-ocr-response"
+    
 
 PyObjectId = Annotated[
     str, 
@@ -71,7 +72,7 @@ class RecommendationResponsePayload(BaseSchema):
     payload: RecommendationResponseData
 
 # 사용자 응답 페이로드
-class PersonaRequestData(BaseSchema):
+class UserPersonaUpdateData(BaseSchema):
     user_id: int
     nickname: str
     gender: str
@@ -81,8 +82,26 @@ class PersonaRequestData(BaseSchema):
     like_ingredients: list[str]
     other_characteristics: Optional[str] = None
 
-class PersonaRequestPayload(BaseSchema):
+class UserPersonaUpdatePayload(BaseSchema):
     event_id: int
     event_type: EventType
-    payload: PersonaRequestData
+    payload: UserPersonaUpdateData
+
+# 장소 재추천 페이로드
+class VoteResultData(BaseSchema):
+    restaurant_id: str
+    like_count: int
+    dislike_count: int
+    liked_user_ids: list[int]
+    disliked_user_ids: list[int]
+
+class RecommendationRefreshRequestData(BaseSchema):
+    dining_data: DiningData
+    user_ids: list[int]
+    vote_result_list: list[VoteResultData]
+
+class RecommendationRefreshRequestPayload(BaseSchema):
+    event_id: int
+    event_type: EventType
+    payload: RecommendationRefreshRequestData
 

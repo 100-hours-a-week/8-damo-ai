@@ -18,8 +18,8 @@ class KafkaService:
         self.settings = get_settings()  
         self.middleware = ExceptionMiddleware()
         self.broker = KafkaBroker(self.settings.KAFKA_BOOTSTRAP_SERVERS, middlewares=[self.middleware])
-        self._recommendation_response_publisher = self.broker.publisher(self.settings.KAFKA_RECOMMENDATION_RESPONSE_TOPIC)
-        self._recommendation_streaming_publisher = self.broker.publisher(self.settings.KAFKA_RECOMMENDATION_STREAMING_TOPIC)
+        self._recommendation_response_publisher = self.broker.publisher(TopicType.RECOMMENDATION_RESPONSE.value)
+        self._recommendation_streaming_publisher = self.broker.publisher(TopicType.RECOMMENDATION_STREAMING.value)
         self.error_handler()
 
     async def publish_recommendation_response(self, event: RecommendationRequestPayload, key: bytes, data: RecommendationResponseData):
@@ -41,6 +41,11 @@ class KafkaService:
             key=key
         )
         print(f"Service: Published recommendation streaming for key {key.decode('utf-8') if key else 'None'}")
+
+    # 이벤트 타입 수정 필요
+    async def publish_receipt_ocr_response(self, event, key: bytes):
+        pass
+
         
     # 에러 핸들러(아마 사용안할듯)
     def error_handler(self):
@@ -63,7 +68,20 @@ class KafkaService:
 
     #  토픽 전달
     def get_recommendation_request_topic(self):
-        return self.settings.KAFKA_RECOMMENDATION_REQUEST_TOPIC
+        return TopicType.RECOMMENDATION_REQUEST.value
 
-    def get_persona_request_topic(self):
-        return self.settings.KAFKA_PERSONA_REQUEST_TOPIC
+    def get_recommendation_refresh_request_topic(self):
+        return TopicType.RECOMMENDATION_REFRESH_REQUEST.value
+
+    def get_restaurant_confirmed_topic(self):
+        return TopicType.RESTAURANT_CONFIRMED.value
+
+    def get_user_persona_update_topic(self):
+        return TopicType.USER_PERSONA_UPDATE.value
+
+    def get_receipt_ocr_request_topic(self):
+        return TopicType.RECEIPT_OCR_REQUEST.value
+
+
+
+        

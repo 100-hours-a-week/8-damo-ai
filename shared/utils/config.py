@@ -22,17 +22,6 @@ class Settings(BaseSettings):
     OPENROUTER_MODEL: str
 
     KAFKA_BOOTSTRAP_SERVERS: str
-    # 사용 토픽 (BE -> AI)
-    KAFKA_RECOMMENDATION_REQUEST_TOPIC: str = TopicType.RECOMMENDATION_REQUEST.value
-    KAFKA_RECOMMENDATION_RETRY_TOPIC: str = TopicType.RECOMMENDATION_RETRY.value
-    KAFKA_PERSONA_REQUEST_TOPIC: str = TopicType.PERSONA_REQUEST.value
-    KAFKA_OCR_REQUEST_TOPIC: str = TopicType.OCR_REQUEST.value
-    KAFKA_FIX_REQUEST_TOPIC: str = TopicType.FIX_REQUEST.value
-    # 사용 토픽 (AI -> BE)
-    KAFKA_RECOMMENDATION_RESPONSE_TOPIC: str = TopicType.RECOMMENDATION_RESPONSE.value
-    KAFKA_RECOMMENDATION_STREAMING_TOPIC: str = TopicType.RECOMMENDATION_STREAMING.value
-    KAFKA_OCR_RESPONSE_TOPIC: str = TopicType.OCR_RESPONSE.value
-    
     KAFKA_GROUP_ID: str = "ai-message-group"
     KAFKA_CLIENT_ID: str = f"ai-client-{uuid4()}"
     KAFKA_AUTO_OFFSET_RESET: str = "earliest"
