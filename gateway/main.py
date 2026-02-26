@@ -6,7 +6,8 @@ from shared.schemas.stream_schema import (
     RecommendedItem,
     RecommendationResponseData,
     RecommendationRefreshRequestPayload,
-    UserPersonaUpdatePayload
+    UserPersonaUpdatePayload,
+    RecommendationStreamingData
 )
 from shared.utils.config import get_settings
 
@@ -23,7 +24,7 @@ async def handle_recommendation(event: RecommendationRequestPayload, message = C
 
     # TODO: 실제 추천 로직 구현
     resp_data = RecommendationResponseData(
-        group_id=event.payload.dining_data.groups_id,
+        dining_id=event.payload.dining_data.dining_id,
         recommendation_count=1,
         recommended_items=[
             RecommendedItem(
@@ -33,11 +34,16 @@ async def handle_recommendation(event: RecommendationRequestPayload, message = C
         ]
     )
 
-    await service.publish_recommendation_response(event, message, resp_data)
+    # await service.publish_recommendation_response(event, message, resp_data)
+    await service.publish_recommendation_streaming(RecommendationStreamingData(
+        dining_id=1,
+        user_id=1,
+        content="test"
+    ))
 
 # 재추천 요청
 @broker.subscriber(service.get_recommendation_refresh_request_topic(), group_id=settings.KAFKA_GROUP_ID)
-async def handle_recommendation_refresh(event: RecommendationRefreshRequestPayload, message = Context()):
+async def handle_recommendation_refresh(event, message = Context()):
     print("get recommendation refresh request")
     print(event)
 
