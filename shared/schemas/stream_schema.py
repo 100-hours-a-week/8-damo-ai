@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field, ConfigDict, BeforeValidator
 from pydantic.alias_generators import to_camel
 from bson import ObjectId
 
+
 class EventType(str, Enum):
     RECOMMENDATION_REQUEST = "RECOMMENDATION_REQUEST"
     RECOMMENDATION_RESPONSE = "RECOMMENDATION_RESPONSE"
@@ -15,6 +16,12 @@ class EventType(str, Enum):
     RECEIPT_OCR_REQUEST = "RECEIPT_OCR_REQUEST"
     RECEIPT_OCR_RESPONSE = "RECEIPT_OCR_RESPONSE"
 
+    # iterative discussion
+    CONSENSUS_REQUEST = "CONSENSUS_REQUEST"
+    CONSENSUS_DIALOGUE = "CONSENSUS_DIALOGUE"
+    CONSENSUS_RESULT = "CONSENSUS_RESULT"
+
+
 class TopicType(str, Enum):
     RECOMMENDATION_REQUEST = "recommendation-request"
     RECOMMENDATION_RESPONSE = "recommendation-response"
@@ -24,19 +31,29 @@ class TopicType(str, Enum):
     USER_PERSONA_UPDATE = "user-persona-update"
     RECEIPT_OCR_REQUEST = "receipt-ocr-request"
     RECEIPT_OCR_RESPONSE = "receipt-ocr-response"
-    
+    RECOMMENDATION_RETRY = "recommendation-retry"
+    PERSONA_REQUEST = "persona-request"
+    OCR_REQUEST = "ocr-request"
+    OCR_RESPONSE = "ocr-response"
+    FIX_REQUEST = "fix-request"
+
+    # iterative discussion
+    CONSENSUS_REQUEST = "consensus-request"
+    CONSENSUS_DIALOGUE = "consensus-dialogue"
+    CONSENSUS_RESULT = "consensus-result"
+
 
 PyObjectId = Annotated[
-    str, 
+    str,
     BeforeValidator(lambda v: str(v) if isinstance(v, ObjectId) else v),
 ]
 
+
 class BaseSchema(BaseModel):
     model_config = ConfigDict(
-        alias_generator=to_camel,
-        populate_by_name=True,
-        arbitrary_types_allowed=True 
+        alias_generator=to_camel, populate_by_name=True, arbitrary_types_allowed=True
     )
+
 
 # 추천 요청 페이로드
 class DiningData(BaseSchema):
@@ -47,29 +64,35 @@ class DiningData(BaseSchema):
     x: str = Field(..., description="회식 장소의 경도")
     y: str = Field(..., description="회식 장소의 위도")
 
+
 class RecommendationRequestData(BaseSchema):
     dining_data: DiningData
     user_ids: list[int]
+
 
 class RecommendationRequestPayload(BaseSchema):
     event_id: int
     event_type: EventType
     payload: RecommendationRequestData
 
+
 # 추천 응답 페이로드
 class RecommendedItem(BaseSchema):
     restaurant_id: str
     reasoning_description: Optional[str] = None
+
 
 class RecommendationResponseData(BaseSchema):
     group_id: int
     recommendation_count: int
     recommended_items: list[RecommendedItem]
 
+
 class RecommendationResponsePayload(BaseSchema):
     event_id: int
     event_type: EventType
     payload: RecommendationResponseData
+
 
 # 사용자 응답 페이로드
 class UserPersonaUpdateData(BaseSchema):
@@ -81,6 +104,7 @@ class UserPersonaUpdateData(BaseSchema):
     like_foods: list[str]
     like_ingredients: list[str]
     other_characteristics: Optional[str] = None
+
 
 class UserPersonaUpdatePayload(BaseSchema):
     event_id: int
@@ -105,3 +129,51 @@ class RecommendationRefreshRequestPayload(BaseSchema):
     event_type: EventType
     payload: RecommendationRefreshRequestData
 
+
+# 합의 요청 페이로드
+class ConsensusRequestData(BaseSchema):
+    dining_data: DiningData
+    user_ids: list[int]
+    filtered_restaurant_ids: list[str]
+    max_rounds: int = 3
+    min_rounds: int = 2
+
+
+class ConsensusRequestPayload(BaseSchema):
+    event_id: int
+    event_type: EventType
+    payload: ConsensusRequestData
+
+
+# 합의 대화 페이로드 (실시간 스트리밍)
+class ConsensusDialogueData(BaseSchema):
+    dining_id: int
+    user_id: str
+    content: str
+
+
+class ConsensusDialoguePayload(BaseSchema):
+    event_id: int
+    event_type: EventType
+    payload: ConsensusDialogueData
+
+
+# 합의 결과 페이로드
+class ConsensusResultItem(BaseSchema):
+    restaurant_id: str
+    place_name: str
+    approve_count: int
+    reject_count: int
+    reason: str
+
+
+class ConsensusResultData(BaseSchema):
+    dining_id: int
+    final_selection: list[ConsensusResultItem]
+    final_decision: str
+
+
+class ConsensusResultPayload(BaseSchema):
+    event_id: int
+    event_type: EventType
+    payload: ConsensusResultData

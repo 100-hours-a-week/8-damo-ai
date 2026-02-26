@@ -2,13 +2,18 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from uuid import uuid4
 from shared.schemas.stream_schema import TopicType
 
+
 class Settings(BaseSettings):
     GOOGLE_API_KEY: str
     GEMINI_MODEL: str = "gemini-3-flash-preview"
     OPENAI_API_KEY: str
     OPENAI_MODEL: str = "gpt-4o-mini"
+    OPENAI_BASE_URL: str = ""
     MONGODB_URI: str
     DB_NAME: str = "damo"
+    LOCAL_MODEL: str = ""
+    LOCAL_BASE_URL: str = ""
+    LOCAL_API_KEY: str = ""
     LANGFUSE_SECRET_KEY: str
     LANGFUSE_PUBLIC_KEY: str
     LANGFUSE_BASE_URL: str
@@ -22,11 +27,30 @@ class Settings(BaseSettings):
     OPENROUTER_MODEL: str
 
     KAFKA_BOOTSTRAP_SERVERS: str
+
+    # 사용 토픽 (BE -> AI)
+    KAFKA_RECOMMENDATION_REQUEST_TOPIC: str = TopicType.RECOMMENDATION_REQUEST.value
+    KAFKA_RECOMMENDATION_RETRY_TOPIC: str = TopicType.RECOMMENDATION_RETRY.value
+    KAFKA_PERSONA_REQUEST_TOPIC: str = TopicType.PERSONA_REQUEST.value
+    KAFKA_OCR_REQUEST_TOPIC: str = TopicType.OCR_REQUEST.value
+    KAFKA_FIX_REQUEST_TOPIC: str = TopicType.FIX_REQUEST.value
+    KAFKA_CONSENSUS_REQUEST_TOPIC: str = TopicType.CONSENSUS_REQUEST.value
+    # 사용 토픽 (AI -> BE)
+    KAFKA_RECOMMENDATION_RESPONSE_TOPIC: str = TopicType.RECOMMENDATION_RESPONSE.value
+    KAFKA_RECOMMENDATION_STREAMING_TOPIC: str = TopicType.RECOMMENDATION_STREAMING.value
+    KAFKA_OCR_RESPONSE_TOPIC: str = TopicType.OCR_RESPONSE.value
+    KAFKA_CONSENSUS_DIALOGUE_TOPIC: str = TopicType.CONSENSUS_DIALOGUE.value
+    KAFKA_CONSENSUS_RESULT_TOPIC: str = TopicType.CONSENSUS_RESULT.value
+
     KAFKA_GROUP_ID: str = "ai-message-group"
     KAFKA_CLIENT_ID: str = f"ai-client-{uuid4()}"
     KAFKA_AUTO_OFFSET_RESET: str = "earliest"
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
+
+settings = Settings()
+
+
 def get_settings() -> Settings:
-    return Settings()
+    return settings
