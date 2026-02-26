@@ -22,8 +22,8 @@ class Settings(BaseSettings):
     OPENROUTER_MODEL: str
 
     KAFKA_BOOTSTRAP_SERVERS: str
-    KAFKA_GROUP_ID: str = "ai-message-group"
-    KAFKA_CLIENT_ID: str = f"ai-client-{uuid4()}"
+    KAFKA_GROUP_ID: str = "damo-ai-dev"
+    KAFKA_CLIENT_ID: str = f"damo-ai-dev-{uuid4()}"
     KAFKA_AUTO_OFFSET_RESET: str = "earliest"
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
