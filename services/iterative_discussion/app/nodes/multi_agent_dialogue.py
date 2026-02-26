@@ -23,13 +23,39 @@ def _format_candidate_list(candidate_pool: List[Dict[str, Any]]) -> str:
     for i, r in enumerate(candidate_pool, 1):
         name = r.get("place_name", "알 수 없음")
         category = r.get("category_detail", "")
-        score = r.get("score", 0)
         menus = r.get("menus", [])
         menu_text = ", ".join(
             f"{m.get('title', '')}({m.get('price', 0)}원)" for m in menus
         ) if menus else "메뉴 정보 없음"
-        lines.append(f"{i}. {name} ({category}) [점수: {score}] | 메뉴: {menu_text}")
+        review_count = r.get("review_count", 0)
+        keywords = r.get("restaurant_review_keywords", [])
+        keyword_text = ", ".join(
+            f"{k.get('keyword', '')}({k.get('count', 0)})" for k in keywords[:3]
+        ) if keywords else "리뷰 없음"
+        amenities = r.get("amenities", [])
+        amenity_text = ", ".join(amenities) if amenities else ""
+        parts = [
+            f"{i}. {name} ({category})",
+            f"   메뉴: {menu_text}",
+            f"   리뷰: {review_count}개 | 키워드: {keyword_text}",
+        ]
+        if amenity_text:
+            parts.append(f"   편의: {amenity_text}")
+        lines.append("\n".join(parts))
     return "\n".join(lines)
+
+
+def _format_dining_info(dining_data: Dict[str, Any]) -> str:
+    """회식 정보(예산, 날짜)를 텍스트로 포맷."""
+    budget = dining_data.get("budget") or dining_data.get("Budget", 0)
+    dining_date = dining_data.get("dining_date") or dining_data.get("diningDate", "")
+    parts = []
+    if budget:
+        parts.append(f"예산: {budget:,}원")
+    if dining_date:
+        date_str = str(dining_date).split("T")[0] if "T" in str(dining_date) else str(dining_date)
+        parts.append(f"날짜: {date_str}")
+    return " | ".join(parts) if parts else "회식 정보 없음"
 
 
 def _format_previous_messages(dialogue_history: List[Dict[str, Any]]) -> str:
@@ -45,7 +71,7 @@ def _format_previous_messages(dialogue_history: List[Dict[str, Any]]) -> str:
 
 
 async def multi_agent_dialogue(state: ConsensusState, config: RunnableConfig) -> dict:
-    """Node 3: 각 페르소나가 1회 발언하는 토론 라운드.
+    """Node 3: 각 페르소나가 rotations_per_round회 발언하는 토론 라운드.
 
     config["configurable"]["on_persona_speak"] 콜백이 있으면
     각 페르소나 발언 직후 호출하여 실시간 스트리밍을 지원한다.
@@ -64,6 +90,8 @@ async def multi_agent_dialogue(state: ConsensusState, config: RunnableConfig) ->
     messages = list(state.get("messages", []))
     current_round = state.get("round", 0)
     user_data_list = state.get("user_data_list", [])
+    dining_data = state.get("dining_data", {})
+    rotations = state.get("rotations_per_round", 2)
 
     if not persona_prompts:
         return {"is_error": True, "error_message": "persona_prompts가 비어있습니다."}
@@ -75,6 +103,7 @@ async def multi_agent_dialogue(state: ConsensusState, config: RunnableConfig) ->
         id_to_nickname[uid] = user.get("nickname", "익명")
 
     candidate_text = _format_candidate_list(candidate_pool)
+    dining_info = _format_dining_info(dining_data)
     llm = get_chat_llm(temperature=0.7, local=True)
 
     # 사회자 피드백이 있으면 dialogue_history에 추가
@@ -98,54 +127,58 @@ async def multi_agent_dialogue(state: ConsensusState, config: RunnableConfig) ->
 
     initial_history_len = len(dialogue_history)
 
-    for user_id, system_prompt in persona_prompts.items():
-        nickname = id_to_nickname.get(user_id, "익명")
-        previous_text = _format_previous_messages(dialogue_history)
+    for rotation in range(rotations):
+        for user_id, system_prompt in persona_prompts.items():
+            nickname = id_to_nickname.get(user_id, "익명")
+            previous_text = _format_previous_messages(dialogue_history)
 
-        # 프롬프트 분기: 사회자 피드백 > 첫 라운드 > 일반
-        is_first = current_round == 0 and len(dialogue_history) == 0
-        if moderator_feedback:
-            user_prompt = GUIDED_ROUND_USER_PROMPT.format(
-                candidate_list=candidate_text,
-                previous_messages=previous_text,
-                moderator_feedback=moderator_feedback,
-            )
-        elif is_first:
-            user_prompt = FIRST_ROUND_USER_PROMPT.format(
-                candidate_list=candidate_text,
-            )
-        else:
-            user_prompt = DIALOGUE_USER_PROMPT.format(
-                candidate_list=candidate_text,
-                previous_messages=previous_text,
-            )
+            # 프롬프트 분기: 사회자 피드백(첫 rotation만) > 첫 라운드 > 일반
+            is_first = current_round == 0 and len(dialogue_history) == 0
+            if moderator_feedback and rotation == 0:
+                user_prompt = GUIDED_ROUND_USER_PROMPT.format(
+                    dining_info=dining_info,
+                    candidate_list=candidate_text,
+                    previous_messages=previous_text,
+                    moderator_feedback=moderator_feedback,
+                )
+            elif is_first:
+                user_prompt = FIRST_ROUND_USER_PROMPT.format(
+                    dining_info=dining_info,
+                    candidate_list=candidate_text,
+                )
+            else:
+                user_prompt = DIALOGUE_USER_PROMPT.format(
+                    dining_info=dining_info,
+                    candidate_list=candidate_text,
+                    previous_messages=previous_text,
+                )
 
-        llm_messages = [
-            SystemMessage(content=system_prompt),
-            HumanMessage(content=user_prompt),
-        ]
+            llm_messages = [
+                SystemMessage(content=system_prompt),
+                HumanMessage(content=user_prompt),
+            ]
 
-        try:
-            response = await llm.ainvoke(llm_messages)
-        except Exception:
-            logger.warning("LLM 호출 실패: user_id=%s", user_id, exc_info=True)
-            continue
-        content = response.content
+            try:
+                response = await llm.ainvoke(llm_messages)
+            except Exception:
+                logger.warning("LLM 호출 실패: user_id=%s", user_id, exc_info=True)
+                continue
+            content = response.content
 
-        # 대화 기록에 추가
-        entry = {
-            "user_id": user_id,
-            "nickname": nickname,
-            "round": current_round + 1,
-            "content": content,
-        }
-        dialogue_history.append(entry)
-        messages.append(AIMessage(content=f"[{nickname}]: {content}", name=user_id))
+            # 대화 기록에 추가
+            entry = {
+                "user_id": user_id,
+                "nickname": nickname,
+                "round": current_round + 1,
+                "content": content,
+            }
+            dialogue_history.append(entry)
+            messages.append(AIMessage(content=f"[{nickname}]: {content}", name=user_id))
 
-        if on_speak:
-            result = on_speak(entry)
-            if inspect.isawaitable(result):
-                await result
+            if on_speak:
+                result = on_speak(entry)
+                if inspect.isawaitable(result):
+                    await result
 
     new_entries = len(dialogue_history) - initial_history_len
     if new_entries == 0:

@@ -12,6 +12,7 @@ class ConsensusState(TypedDict):
     user_ids: List[int]
     max_rounds: int
     min_rounds: int  # 최소 토론 라운드 수
+    rotations_per_round: int  # 라운드 내 페르소나 발언 횟수
     user_data_list: List[Dict[str, Any]]
     dining_data: Dict[str, Any]
     filtered_restaurant_ids: List[str]
@@ -53,8 +54,9 @@ def create_initial_state(
     user_ids: List[int],
     dining_data: Dict[str, Any],
     filtered_restaurant_ids: List[str],
-    max_rounds: int = 3,
+    max_rounds: int = 5,
     min_rounds: int = 2,
+    rotations_per_round: int = 2,
     vote_result_list: List[Dict[str, Any]] | None = None,
 ) -> ConsensusState:
     """초기 상태를 생성하는 팩토리 함수.
@@ -75,6 +77,7 @@ def create_initial_state(
         user_ids=user_ids,
         max_rounds=max_rounds,
         min_rounds=min_rounds,
+        rotations_per_round=rotations_per_round,
         user_data_list=[],
         dining_data=dining_data,
         filtered_restaurant_ids=filtered_restaurant_ids,

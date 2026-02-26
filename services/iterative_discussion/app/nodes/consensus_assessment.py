@@ -27,7 +27,15 @@ def _format_candidate_list(candidate_pool: List[Dict[str, Any]]) -> str:
         menu_text = ", ".join(
             f"{m.get('title', '')}({m.get('price', 0)}원)" for m in menus
         ) if menus else "메뉴 정보 없음"
-        lines.append(f"{i}. {name} ({category}) [id: {rid}] | 메뉴: {menu_text}")
+        review_count = r.get("review_count", 0)
+        keywords = r.get("restaurant_review_keywords", [])
+        keyword_text = ", ".join(
+            f"{k.get('keyword', '')}({k.get('count', 0)})" for k in keywords[:3]
+        ) if keywords else "리뷰 없음"
+        lines.append(
+            f"{i}. {name} ({category}) [id: {rid}] | 메뉴: {menu_text} | "
+            f"리뷰: {review_count}개, 키워드: {keyword_text}"
+        )
     return "\n".join(lines)
 
 
@@ -104,7 +112,7 @@ def _build_moderator_feedback(
     if rejected:
         rejected_names = [r.get("place_name", "?") for r in rejected]
         lines.append(
-            f"- 거부된 식당: {', '.join(rejected_names)} → 새로운 후보로 교체됩니다."
+            f"- 거부된 식당: {', '.join(rejected_names)} → 제외 후 새로운 후보로 교체 예정"
         )
     lines.append("- 다음 라운드에서 위 식당들에 대해 더 구체적으로 논의해주세요.")
     return "\n".join(lines)

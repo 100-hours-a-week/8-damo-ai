@@ -16,6 +16,7 @@ async def moderator_preselect(state: ConsensusState) -> dict:
     restaurant_ids = state.get("filtered_restaurant_ids", [])
     user_data_list = state.get("user_data_list", [])
     rejected_ids = set(state.get("rejected_restaurant_ids", []))
+    prev_pool = state.get("candidate_pool", [])
 
     if not restaurant_ids:
         return {
@@ -60,4 +61,30 @@ async def moderator_preselect(state: ConsensusState) -> dict:
         top_k=10,
     )
 
-    return {"candidate_pool": candidate_pool, "rejected_restaurant_ids": []}
+    # 후보 교체 피드백 생성 (재선별 시에만)
+    moderator_feedback = state.get("moderator_feedback", "")
+    if prev_pool and rejected_ids:
+        prev_ids = {str(r.get("_id", "")) for r in prev_pool}
+        new_ids = {str(r.get("_id", "")) for r in candidate_pool}
+        added = [
+            r for r in candidate_pool
+            if str(r.get("_id", "")) in (new_ids - prev_ids)
+        ]
+        removed = [
+            r for r in prev_pool
+            if str(r.get("_id", "")) in rejected_ids
+        ]
+        if removed or added:
+            lines = []
+            for r in removed:
+                lines.append(f"- 제외: {r.get('place_name', '?')}")
+            for r in added:
+                lines.append(f"- 신규: {r.get('place_name', '?')} ({r.get('category_detail', '')})")
+            swap_text = "\n".join(lines)
+            moderator_feedback = f"{moderator_feedback}\n\n[후보 교체 안내]\n{swap_text}".strip()
+
+    return {
+        "candidate_pool": candidate_pool,
+        "rejected_restaurant_ids": [],
+        "moderator_feedback": moderator_feedback,
+    }
