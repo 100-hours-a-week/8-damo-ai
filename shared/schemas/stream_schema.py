@@ -15,11 +15,9 @@ class EventType(str, Enum):
     USER_PERSONA_UPDATE = "USER_PERSONA_UPDATE"
     RECEIPT_OCR_REQUEST = "RECEIPT_OCR_REQUEST"
     RECEIPT_OCR_RESPONSE = "RECEIPT_OCR_RESPONSE"
-
-    # iterative discussion
-    CONSENSUS_REQUEST = "CONSENSUS_REQUEST"
-    CONSENSUS_DIALOGUE = "CONSENSUS_DIALOGUE"
-    CONSENSUS_RESULT = "CONSENSUS_RESULT"
+    # AI 내부 통신
+    DISCUSSION_REQUEST = "DISCUSSION_REQUEST"
+    DISCUSSION_RESPONSE = "DISCUSSION_RESPONSE"
 
 
 class TopicType(str, Enum):
@@ -31,16 +29,8 @@ class TopicType(str, Enum):
     USER_PERSONA_UPDATE = "user-persona-update"
     RECEIPT_OCR_REQUEST = "receipt-ocr-request"
     RECEIPT_OCR_RESPONSE = "receipt-ocr-response"
-    RECOMMENDATION_RETRY = "recommendation-retry"
-    PERSONA_REQUEST = "persona-request"
-    OCR_REQUEST = "ocr-request"
-    OCR_RESPONSE = "ocr-response"
-    FIX_REQUEST = "fix-request"
-
-    # iterative discussion
-    CONSENSUS_REQUEST = "consensus-request"
-    CONSENSUS_DIALOGUE = "consensus-dialogue"
-    CONSENSUS_RESULT = "consensus-result"
+    DISCUSSION_REQUEST = "discussion-request"
+    DISCUSSION_RESPONSE = "discussion-response"
 
 
 PyObjectId = Annotated[
@@ -111,6 +101,7 @@ class UserPersonaUpdatePayload(BaseSchema):
     event_type: EventType
     payload: UserPersonaUpdateData
 
+
 # 장소 재추천 페이로드
 class VoteResultData(BaseSchema):
     restaurant_id: str
@@ -119,10 +110,12 @@ class VoteResultData(BaseSchema):
     liked_user_ids: list[int]
     disliked_user_ids: list[int]
 
+
 class RecommendationRefreshRequestData(BaseSchema):
     dining_data: DiningData
     user_ids: list[int]
     vote_result_list: list[VoteResultData]
+
 
 class RecommendationRefreshRequestPayload(BaseSchema):
     event_id: int
@@ -130,50 +123,32 @@ class RecommendationRefreshRequestPayload(BaseSchema):
     payload: RecommendationRefreshRequestData
 
 
-# 합의 요청 페이로드
-class ConsensusRequestData(BaseSchema):
+# AI 회식 요청
+class DiscussionRequestData(BaseSchema):
     dining_data: DiningData
     user_ids: list[int]
-    filtered_restaurant_ids: list[str]
-    max_rounds: int = 3
-    min_rounds: int = 2
+    filtered_restaurant: list[str]
+    vote_result_list: list[VoteResultData]
 
 
-class ConsensusRequestPayload(BaseSchema):
+class DiscussionRequestPayload(BaseSchema):
     event_id: int
     event_type: EventType
-    payload: ConsensusRequestData
+    payload: DiscussionRequestData
 
 
-# 합의 대화 페이로드 (실시간 스트리밍)
-class ConsensusDialogueData(BaseSchema):
-    dining_id: int
-    user_id: str
-    content: str
-
-
-class ConsensusDialoguePayload(BaseSchema):
-    event_id: int
-    event_type: EventType
-    payload: ConsensusDialogueData
-
-
-# 합의 결과 페이로드
-class ConsensusResultItem(BaseSchema):
+# AI 회식 응답
+class FinalRestaurant(BaseSchema):
     restaurant_id: str
-    place_name: str
-    approve_count: int
-    reject_count: int
-    reason: str
+    summary: Optional[str] = None
 
 
-class ConsensusResultData(BaseSchema):
-    dining_id: int
-    final_selection: list[ConsensusResultItem]
-    final_decision: str
+class DiscussionResponseData(BaseSchema):
+    final_restaurant_ids: list[FinalRestaurant]
+    persona_vote_result_list: list[VoteResultData]
 
 
-class ConsensusResultPayload(BaseSchema):
+class DiscussionResponsePayload(BaseSchema):
     event_id: int
     event_type: EventType
-    payload: ConsensusResultData
+    payload: DiscussionResponseData

@@ -1,18 +1,42 @@
-from faststream import FastStream, ExceptionMiddleware, Context
-from faststream.kafka import KafkaBroker
+from faststream import ExceptionMiddleware, Context
+from typing import Awaitable, Callable
+from faststream.kafka import KafkaBroker, KafkaMessage
+from aiokafka import ConsumerRecord
+import dataclasses
 
 from shared.schemas.stream_schema import (
     RecommendationRequestPayload,
     RecommendationResponseData,
     RecommendationResponsePayload,
-    ConsensusDialogueData,
-    ConsensusDialoguePayload,
-    ConsensusResultData,
-    ConsensusResultPayload,
+    DiscussionRequestPayload,
+    DiscussionResponsePayload,
     EventType,
     TopicType,
 )
 from shared.utils.config import get_settings
+
+
+# 커스텀 파서
+async def safe_header_parser(
+    msg: ConsumerRecord,
+    original_parser: Callable[[ConsumerRecord], Awaitable[KafkaMessage]],
+) -> KafkaMessage:
+    safe_headers = []
+
+    # Kafka 원본 메시지(ConsumerRecord)에 헤더가 존재하는지 확인
+    if msg.headers:
+        for key, value in msg.headers:
+            if key == "elasticapmtraceparent":
+                continue  # (여기 아래 로직 안타고 다음 헤더로 넘어감)
+            if isinstance(value, bytes):
+                safe_value = value.decode("utf-8", errors="ignore").encode("utf-8")
+                safe_headers.append((key, safe_value))
+            else:
+                safe_headers.append((key, value))
+
+    # ConsumerRecord는 namedtuple이므로 _replace를 사용해 헤더만 안전한 값으로 교체합니다.
+    safe_msg = dataclasses.replace(msg, headers=tuple(safe_headers))
+    return await original_parser(safe_msg)
 
 
 class KafkaService:
@@ -24,7 +48,10 @@ class KafkaService:
         self.settings = get_settings()
         self.middleware = ExceptionMiddleware()
         self.broker = KafkaBroker(
-            self.settings.KAFKA_BOOTSTRAP_SERVERS, middlewares=[self.middleware]
+            self.settings.KAFKA_BOOTSTRAP_SERVERS,
+            middlewares=[self.middleware],
+            parser=safe_header_parser,
+            client_id=self.settings.KAFKA_CLIENT_ID,
         )
         self._recommendation_response_publisher = self.broker.publisher(
             TopicType.RECOMMENDATION_RESPONSE.value
@@ -32,24 +59,12 @@ class KafkaService:
         self._recommendation_streaming_publisher = self.broker.publisher(
             TopicType.RECOMMENDATION_STREAMING.value
         )
-        self._recommendation_response_publisher = self.broker.publisher(
-            self.settings.KAFKA_RECOMMENDATION_RESPONSE_TOPIC
-        )
-        self._recommendation_streaming_publisher = self.broker.publisher(
-            self.settings.KAFKA_RECOMMENDATION_STREAMING_TOPIC
-        )
-        self._consensus_dialogue_publisher = self.broker.publisher(
-            self.settings.KAFKA_CONSENSUS_DIALOGUE_TOPIC
-        )
-        self._consensus_result_publisher = self.broker.publisher(
-            self.settings.KAFKA_CONSENSUS_RESULT_TOPIC
-        )
         self.error_handler()
 
     async def publish_recommendation_response(
         self,
         event: RecommendationRequestPayload,
-        key: bytes,
+        message: KafkaMessage,
         data: RecommendationResponseData,
     ):
         resp_data = RecommendationResponsePayload(
@@ -58,54 +73,31 @@ class KafkaService:
             payload=data,
         )
 
+        incoming_headers = dict(message.headers) if message.headers else {}
+
         await self._recommendation_response_publisher.publish(
-            message=resp_data, key=key
+            headers=incoming_headers, message=resp_data, key=message.raw_message.key
         )
         print(
-            f"Service: Published recommendation response for key {key.decode('utf-8') if key else 'None'}"
+            f"Service: Published recommendation response for key {message.raw_message.key.decode('utf-8') if message.raw_message.key else 'None'}"
         )
 
-    async def publish_recommendation_streaming(self, key: bytes, data: dict[str, str]):
-        await self._recommendation_streaming_publisher.publish(message=data, key=key)
+    async def publish_recommendation_streaming(
+        self, message: KafkaMessage, data: dict[str, str]
+    ):
+        await self._recommendation_streaming_publisher.publish(
+            message=data, key=message.raw_message.key
+        )
         print(
             f"Service: Published recommendation streaming for key {key.decode('utf-8') if key else 'None'}"
         )
 
     # 이벤트 타입 수정 필요
-    async def publish_receipt_ocr_response(self, event, key: bytes):
+    async def publish_receipt_ocr_response(self, event, message: KafkaMessage):
         pass
 
-    async def publish_consensus_dialogue(
-        self, event_id: int, key: bytes, data: ConsensusDialogueData
-    ) -> None:
-        payload = ConsensusDialoguePayload(
-            event_id=event_id,
-            event_type=EventType.CONSENSUS_DIALOGUE.value,
-            payload=data,
-        )
-        await self._consensus_dialogue_publisher.publish(
-            message=payload,
-            key=key,
-        )
-        print(
-            f"Service: Published consensus dialogue for key {key.decode('utf-8') if key else 'None'}"
-        )
-
-    async def publish_consensus_result(
-        self, event_id: int, key: bytes, data: ConsensusResultData
-    ) -> None:
-        payload = ConsensusResultPayload(
-            event_id=event_id,
-            event_type=EventType.CONSENSUS_RESULT.value,
-            payload=data,
-        )
-        await self._consensus_result_publisher.publish(
-            message=payload,
-            key=key,
-        )
-        print(
-            f"Service: Published consensus result for key {key.decode('utf-8') if key else 'None'}"
-        )
+    async def publish_ai_discussion_response(self, event, message: KafkaMessage):
+        pass
 
     # 에러 핸들러(아마 사용안할듯)
     def error_handler(self):
@@ -113,10 +105,11 @@ class KafkaService:
         async def validation_exception_handler(
             exc: Exception, message=Context()
         ) -> None:
-            error_topic = message.raw_message.topic
+            raw_msg = getattr(message, "raw_message", message)
+            error_topic = getattr(raw_msg, "topic", "unknown")
             event_type = None
 
-            match message.raw_message.topic:
+            match error_topic:
                 case TopicType.RECOMMENDATION_REQUEST.value:
                     event_type = EventType.RECOMMENDATION_RESPONSE.value
                 case TopicType.PERSONA_REQUEST.value:
@@ -127,8 +120,8 @@ class KafkaService:
             print(exc)
             print(f"error-topic : {error_topic}")
             print(f"publish-event-type : {event_type}")
-            print(f"key : {message.raw_message.key}")
-            print(f"value : {message.raw_message.value}")
+            print(f"key : {getattr(raw_msg, 'key', None)}")
+            print(f"value : {getattr(raw_msg, 'value', None)}")
 
     #  토픽 전달
     def get_recommendation_request_topic(self):
@@ -146,8 +139,5 @@ class KafkaService:
     def get_receipt_ocr_request_topic(self):
         return TopicType.RECEIPT_OCR_REQUEST.value
 
-    def get_persona_request_topic(self) -> str:
-        return self.settings.KAFKA_PERSONA_REQUEST_TOPIC
-
-    def get_consensus_request_topic(self) -> str:
-        return self.settings.KAFKA_CONSENSUS_REQUEST_TOPIC
+    def get_ai_discussion_request_topic(self):
+        return TopicType.DISCUSSION_REQUEST.value
