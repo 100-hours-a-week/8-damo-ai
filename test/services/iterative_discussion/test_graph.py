@@ -4,28 +4,9 @@ import pytest
 
 from services.iterative_discussion.app.engine.graph import (
     _after_dialogue,
-    _after_persona_factory,
     _check_error,
     _should_continue,
 )
-
-
-class TestAfterPersonaFactory:
-    def test_error_returns_end(self) -> None:
-        state = {"is_error": True}
-        assert _after_persona_factory(state) == "end"
-
-    def test_with_vote_result_returns_evolve(self) -> None:
-        state = {"is_error": False, "vote_result_list": [{"restaurant_id": "r1"}]}
-        assert _after_persona_factory(state) == "evolve"
-
-    def test_no_vote_result_returns_preselect(self) -> None:
-        state = {"is_error": False, "vote_result_list": []}
-        assert _after_persona_factory(state) == "preselect"
-
-    def test_missing_vote_result_returns_preselect(self) -> None:
-        state = {"is_error": False}
-        assert _after_persona_factory(state) == "preselect"
 
 
 class TestCheckError:

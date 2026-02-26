@@ -17,32 +17,20 @@ def sample_user_data_list() -> List[Dict[str, Any]]:
         {
             "id": 1,
             "nickname": "철수",
-            "gender": "남성",
-            "age_group": "20대",
+            "basePersona": "매운 음식을 좋아하는 20대 남성. 한식과 일식을 선호하며 가성비를 중시합니다.",
             "allergies": ["땅콩"],
-            "like_food_categories_id": ["한식", "일식"],
-            "categories_id": ["한식", "일식", "중식"],
-            "other_characteristics": "매운 음식 좋아함",
         },
         {
             "id": 2,
             "nickname": "영희",
-            "gender": "여성",
-            "age_group": "30대",
+            "basePersona": "일식과 양식을 좋아하는 30대 여성. 분위기 있는 식당을 선호합니다.",
             "allergies": [],
-            "like_food_categories_id": ["일식", "양식"],
-            "categories_id": ["일식", "양식"],
-            "other_characteristics": "",
         },
         {
             "id": 3,
             "nickname": "민수",
-            "gender": "남성",
-            "age_group": "20대",
+            "basePersona": "한식과 분식을 좋아하는 20대 남성. 이전 추천에서 일식을 거부한 경향이 있습니다.",
             "allergies": ["갑각류"],
-            "like_food_categories_id": ["한식"],
-            "categories_id": ["한식", "분식"],
-            "other_characteristics": "[System Insight] 이전 추천에서 일식을 거부함",
         },
     ]
 
@@ -203,6 +191,29 @@ def mock_llm_partial_consensus():
   ],
   "rejected": [
     {"restaurant_id": "r4", "place_name": "짬뽕대왕", "reason": "매운 음식 거부"}
+  ]
+}"""
+
+    async def _ainvoke(messages, config=None, **kwargs):
+        return AIMessage(content=json_response)
+
+    llm.ainvoke = AsyncMock(side_effect=_ainvoke)
+    return llm
+
+
+@pytest.fixture
+def mock_llm_with_out_of_pool_rejected():
+    """후보 풀 밖 식당을 rejected에 포함하는 Mock LLM."""
+    llm = MagicMock()
+    json_response = """{
+  "consensus_reached": false,
+  "candidates": [
+    {"restaurant_id": "r1", "place_name": "스시히로", "reason": "다수 찬성"},
+    {"restaurant_id": "r2", "place_name": "김치찌개집", "reason": "한식 선호"}
+  ],
+  "rejected": [
+    {"restaurant_id": "r4", "place_name": "짬뽕대왕", "reason": "매운 음식 거부"},
+    {"restaurant_id": "r999", "place_name": "모랑해물솔밥", "reason": "이전 라운드 거부"}
   ]
 }"""
 

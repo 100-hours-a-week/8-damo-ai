@@ -49,7 +49,7 @@ class TestFormatFunctions:
 
     def test_format_dialogue_history(self, sample_dialogue_history) -> None:
         result = _format_dialogue_history(sample_dialogue_history)
-        assert "라운드1" in result
+        assert "── 라운드 1 ──" in result
         assert "철수" in result
 
 
@@ -303,3 +303,56 @@ class TestConsensusAssessment:
             assert result["consensus_reached"] is True
             assert len(result["consensus_candidates"]) == 5
             assert result["rejected_restaurant_ids"] == ["r4"]
+
+    async def test_rejected_filtered_to_pool_only(
+        self, mock_llm_with_out_of_pool_rejected, sample_dialogue_history
+    ) -> None:
+        """후보 풀 밖 식당(r999)이 rejected에서 제거되는지 검증."""
+        with patch(
+            "services.iterative_discussion.app.nodes.consensus_assessment.get_chat_llm",
+            return_value=mock_llm_with_out_of_pool_rejected,
+        ):
+            candidate_pool = [
+                {"_id": f"r{i}", "place_name": f"식당{i}", "category_detail": "한식"}
+                for i in range(1, 8)
+            ]
+            state = {
+                "candidate_pool": candidate_pool,
+                "dialogue_history": sample_dialogue_history,
+                "round": 1,
+                "max_rounds": 3,
+                "dining_data": {"diningId": 100},
+                "langfuse_trace_id": "",
+            }
+            result = await consensus_assessment(state)
+
+            # r4는 pool에 있으므로 유지, r999는 pool에 없으므로 제거
+            assert "r4" in result["rejected_restaurant_ids"]
+            assert "r999" not in result["rejected_restaurant_ids"]
+            assert len(result["rejected_restaurant_ids"]) == 1
+
+    async def test_moderator_feedback_no_out_of_pool_rejected(
+        self, mock_llm_with_out_of_pool_rejected, sample_dialogue_history
+    ) -> None:
+        """사회자 피드백에 후보 풀 밖 식당이 포함되지 않는지 검증."""
+        with patch(
+            "services.iterative_discussion.app.nodes.consensus_assessment.get_chat_llm",
+            return_value=mock_llm_with_out_of_pool_rejected,
+        ):
+            candidate_pool = [
+                {"_id": f"r{i}", "place_name": f"식당{i}", "category_detail": "한식"}
+                for i in range(1, 8)
+            ]
+            state = {
+                "candidate_pool": candidate_pool,
+                "dialogue_history": sample_dialogue_history,
+                "round": 1,
+                "max_rounds": 3,
+                "dining_data": {"diningId": 100},
+                "langfuse_trace_id": "",
+            }
+            result = await consensus_assessment(state)
+
+            feedback = result["moderator_feedback"]
+            assert "모랑해물솔밥" not in feedback
+            assert "사회자 정리" in feedback
