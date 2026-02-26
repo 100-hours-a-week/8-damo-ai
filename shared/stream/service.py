@@ -8,6 +8,8 @@ from shared.schemas.stream_schema import (
     RecommendationRequestPayload,
     RecommendationResponseData,
     RecommendationResponsePayload,
+    DiscussionRequestPayload,
+    DiscussionResponsePayload,
     EventType,
     TopicType
 )
@@ -80,7 +82,9 @@ class KafkaService:
     async def publish_receipt_ocr_response(self, event, message: KafkaMessage):
         pass
 
-        
+    async def publish_ai_discussion_response(self, event, message: KafkaMessage):
+        pass
+
     # 에러 핸들러(아마 사용안할듯)
     def error_handler(self):
         @self.middleware.add_handler(Exception)
@@ -116,7 +120,7 @@ class KafkaService:
 
     def get_receipt_ocr_request_topic(self):
         return TopicType.RECEIPT_OCR_REQUEST.value
-
-
-
+    
+    def get_ai_discussion_request_topic(self):
+        return TopicType.DISCUSSION_REQUEST.value
         

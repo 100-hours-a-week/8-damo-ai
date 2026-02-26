@@ -4,7 +4,7 @@ from shared.stream.service import KafkaService
 from shared.schemas.stream_schema import (
     RecommendationRequestPayload, 
     RecommendedItem,
-    RecommendationResponseData, 
+    RecommendationResponseData,
     RecommendationRefreshRequestPayload,
     UserPersonaUpdatePayload
 )
