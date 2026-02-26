@@ -1,6 +1,4 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from uuid import uuid4
-from shared.schemas.stream_schema import TopicType
 
 class Settings(BaseSettings):
     GOOGLE_API_KEY: str
@@ -23,7 +21,7 @@ class Settings(BaseSettings):
 
     KAFKA_BOOTSTRAP_SERVERS: str
     KAFKA_GROUP_ID: str = "damo-ai-dev"
-    KAFKA_CLIENT_ID: str = f"damo-ai-dev-{uuid4()}"
+    KAFKA_CLIENT_ID: str = "damo-ai-dev-gateway-client"
     KAFKA_AUTO_OFFSET_RESET: str = "earliest"
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
