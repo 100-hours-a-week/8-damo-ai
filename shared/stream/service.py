@@ -10,6 +10,7 @@ from shared.schemas.stream_schema import (
     RecommendationResponsePayload,
     DiscussionRequestPayload,
     DiscussionResponsePayload,
+    RecommendationStreamingData,
     EventType,
     TopicType
 )
@@ -71,12 +72,12 @@ class KafkaService:
         )
         print(f"Service: Published recommendation response for key {message.raw_message.key.decode('utf-8') if message.raw_message.key else 'None'}")
 
-    async def publish_recommendation_streaming(self, message: KafkaMessage, data: dict[str, str]):
+    async def publish_recommendation_streaming(self, data: RecommendationStreamingData):
         await self._recommendation_streaming_publisher.publish(
             message=data,
-            key=message.raw_message.key
+            key=f"{data.dining_id}-{data.user_id}".encode("utf-8")
         )
-        print(f"Service: Published recommendation streaming for key {key.decode('utf-8') if key else 'None'}")
+        print(f"Service: Published recommendation streaming for key {data.dining_id}-{data.user_id}")
 
     # 이벤트 타입 수정 필요
     async def publish_receipt_ocr_response(self, event, message: KafkaMessage):
@@ -96,8 +97,8 @@ class KafkaService:
             match error_topic:
                 case TopicType.RECOMMENDATION_REQUEST.value:
                     event_type = EventType.RECOMMENDATION_RESPONSE.value
-                case TopicType.PERSONA_REQUEST.value:
-                    event_type = EventType.PERSONA_RESPONSE.value
+                case TopicType.USER_PERSONA_UPDATE.value:
+                    event_type = EventType.USER_PERSONA_UPDATE.value
 
             print(exc)
             print(f"error-topic : {error_topic}")
