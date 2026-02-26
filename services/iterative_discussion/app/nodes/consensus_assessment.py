@@ -23,19 +23,30 @@ def _format_candidate_list(candidate_pool: List[Dict[str, Any]]) -> str:
         name = r.get("place_name", "알 수 없음")
         category = r.get("category_detail", "")
         rid = str(r.get("_id", ""))
-        lines.append(f"{i}. {name} ({category}) [id: {rid}]")
+        menus = r.get("menus", [])
+        menu_text = ", ".join(
+            f"{m.get('title', '')}({m.get('price', 0)}원)" for m in menus
+        ) if menus else "메뉴 정보 없음"
+        lines.append(f"{i}. {name} ({category}) [id: {rid}] | 메뉴: {menu_text}")
     return "\n".join(lines)
 
 
 def _format_dialogue_history(dialogue_history: List[Dict[str, Any]]) -> str:
-    """대화 기록을 텍스트로 포맷."""
-    lines = []
-    for entry in dialogue_history:
-        nickname = entry.get("nickname", "익명")
-        rd = entry.get("round", "?")
-        content = entry.get("content", "")
-        lines.append(f"[라운드{rd} - {nickname}]: {content}")
-    return "\n".join(lines)
+    """대화 기록을 라운드별로 그룹화하여 텍스트로 포맷."""
+    from itertools import groupby
+
+    lines: List[str] = []
+    sorted_history = sorted(dialogue_history, key=lambda e: e.get("round", 0))
+
+    for rd, entries in groupby(sorted_history, key=lambda e: e.get("round", 0)):
+        lines.append(f"── 라운드 {rd} ──")
+        for entry in entries:
+            nickname = entry.get("nickname", "익명")
+            content = entry.get("content", "")
+            lines.append(f"[{nickname}]: {content}")
+        lines.append("")  # 라운드 간 빈 줄
+
+    return "\n".join(lines).rstrip()
 
 
 def _parse_llm_json(text: str) -> Dict[str, Any]:
@@ -58,6 +69,10 @@ def _build_moderator_feedback(
     target_count: int = 5,
 ) -> str:
     """합의 미달 시 사회자 피드백을 생성한다 (LLM 호출 없음)."""
+    # 방어적 필터: rejected를 현재 candidate_pool 기준으로 필터
+    pool_ids = {str(r.get("_id", "")) for r in candidate_pool}
+    rejected = [r for r in rejected if r.get("restaurant_id", "") in pool_ids]
+
     agreed_names = [c.get("place_name", "?") for c in candidates]
     rejected_ids = {r.get("restaurant_id", "") for r in rejected}
     agreed_ids = {c.get("restaurant_id", "") for c in candidates}
@@ -70,19 +85,22 @@ def _build_moderator_feedback(
         if str(r.get("_id", "")) not in excluded_ids
     ]
 
-    need = target_count - len(candidates)
-    lines = ["[사회자 정리]"]
+    agreed_count = len(candidates)
+    need = target_count - agreed_count
+    lines = [f"[사회자 정리] 진행 현황: {agreed_count}/{target_count}"]
     if agreed_names:
         lines.append(
-            f"- 현재까지 합의된 식당: {', '.join(agreed_names)} ({len(agreed_names)}개)"
+            f"- 현재까지 합의된 식당: {', '.join(agreed_names)} ({agreed_count}개)"
         )
     else:
         lines.append("- 현재까지 합의된 식당이 없습니다.")
     lines.append(f"- {need}개 식당에 대한 추가 합의가 필요합니다.")
     if undiscussed:
         lines.append(
-            f"- 아직 충분히 논의되지 않은 후보: {', '.join(undiscussed[:5])}"
+            f"- 아직 논의되지 않은 후보가 {len(undiscussed)}개 있습니다: "
+            f"{', '.join(undiscussed[:5])}"
         )
+        lines.append("  → 이 식당들에 대해 각자 의견을 말씀해주세요.")
     if rejected:
         rejected_names = [r.get("place_name", "?") for r in rejected]
         lines.append(
@@ -109,11 +127,13 @@ async def consensus_assessment(state: ConsensusState) -> dict:
         prompt = DEADLOCK_RESOLUTION_PROMPT.format(
             candidate_list=candidate_text,
             dialogue_history=dialogue_text,
+            current_round=current_round,
         )
     else:
         prompt = CONSENSUS_ASSESSMENT_PROMPT.format(
             candidate_list=candidate_text,
             dialogue_history=dialogue_text,
+            current_round=current_round,
         )
 
     llm = get_chat_llm(temperature=0.0)
@@ -145,7 +165,11 @@ async def consensus_assessment(state: ConsensusState) -> dict:
 
     consensus_reached = parsed.get("consensus_reached", False)
     candidates = parsed.get("candidates", [])
-    rejected = parsed.get("rejected", [])
+    raw_rejected = parsed.get("rejected", [])
+
+    # 핵심 필터: rejected를 현재 candidate_pool에 있는 식당으로만 제한
+    pool_ids = {str(r.get("_id", "")) for r in candidate_pool}
+    rejected = [r for r in raw_rejected if r.get("restaurant_id", "") in pool_ids]
 
     # 토론에서 거부된 식당 ID 목록
     rejected_ids = [r.get("restaurant_id", "") for r in rejected]

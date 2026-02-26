@@ -1,5 +1,6 @@
+import inspect
 import logging
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Awaitable, Callable, Dict, List, Optional, Union
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_core.runnables import RunnableConfig
@@ -23,7 +24,11 @@ def _format_candidate_list(candidate_pool: List[Dict[str, Any]]) -> str:
         name = r.get("place_name", "알 수 없음")
         category = r.get("category_detail", "")
         score = r.get("score", 0)
-        lines.append(f"{i}. {name} ({category}) [점수: {score}]")
+        menus = r.get("menus", [])
+        menu_text = ", ".join(
+            f"{m.get('title', '')}({m.get('price', 0)}원)" for m in menus
+        ) if menus else "메뉴 정보 없음"
+        lines.append(f"{i}. {name} ({category}) [점수: {score}] | 메뉴: {menu_text}")
     return "\n".join(lines)
 
 
@@ -45,9 +50,11 @@ async def multi_agent_dialogue(state: ConsensusState, config: RunnableConfig) ->
     config["configurable"]["on_persona_speak"] 콜백이 있으면
     각 페르소나 발언 직후 호출하여 실시간 스트리밍을 지원한다.
     """
-    # 실시간 콜백 추출 (없으면 무시)
+    # 실시간 콜백 추출 (없으면 무시) — sync/async 모두 지원
     configurable = (config or {}).get("configurable") or {}
-    on_speak: Optional[Callable[[Dict[str, Any]], None]] = configurable.get(
+    on_speak: Optional[
+        Callable[[Dict[str, Any]], Union[None, Awaitable[None]]]
+    ] = configurable.get(
         "on_persona_speak",
     )
 
@@ -85,7 +92,9 @@ async def multi_agent_dialogue(state: ConsensusState, config: RunnableConfig) ->
             name="moderator",
         ))
         if on_speak:
-            on_speak(moderator_entry)
+            result = on_speak(moderator_entry)
+            if inspect.isawaitable(result):
+                await result
 
     initial_history_len = len(dialogue_history)
 
@@ -134,7 +143,9 @@ async def multi_agent_dialogue(state: ConsensusState, config: RunnableConfig) ->
         messages.append(AIMessage(content=f"[{nickname}]: {content}", name=user_id))
 
         if on_speak:
-            on_speak(entry)
+            result = on_speak(entry)
+            if inspect.isawaitable(result):
+                await result
 
     new_entries = len(dialogue_history) - initial_history_len
     if new_entries == 0:

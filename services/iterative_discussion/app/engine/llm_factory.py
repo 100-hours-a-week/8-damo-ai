@@ -28,6 +28,7 @@ def get_chat_llm(temperature: float = 0.7, local: bool = False) -> BaseChatModel
         kwargs = {
             "model": settings.OPENAI_MODEL,
             "temperature": temperature,
+            "api_key": settings.OPENAI_API_KEY,
         }
         if settings.OPENAI_BASE_URL:
             kwargs["base_url"] = settings.OPENAI_BASE_URL
