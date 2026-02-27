@@ -15,6 +15,8 @@ class EventType(str, Enum):
     USER_PERSONA_UPDATE = "USER_PERSONA_UPDATE"
     RECEIPT_OCR_REQUEST = "RECEIPT_OCR_REQUEST"
     RECEIPT_OCR_RESPONSE = "RECEIPT_OCR_RESPONSE"
+    PERSONA_REQUEST = "PERSONA_REQUEST"
+    PERSONA_RESPONSE = "PERSONA_RESPONSE"
     # AI 내부 통신
     DISCUSSION_REQUEST = "DISCUSSION_REQUEST"
     DISCUSSION_RESPONSE = "DISCUSSION_RESPONSE"
@@ -29,6 +31,8 @@ class TopicType(str, Enum):
     USER_PERSONA_UPDATE = "user-persona-update"
     RECEIPT_OCR_REQUEST = "receipt-ocr-request"
     RECEIPT_OCR_RESPONSE = "receipt-ocr-response"
+    PERSONA_REQUEST = "persona-request"
+    PERSONA_RESPONSE = "persona-response"
     DISCUSSION_REQUEST = "discussion-request"
     DISCUSSION_RESPONSE = "discussion-response"
 
@@ -123,6 +127,18 @@ class RecommendationRefreshRequestPayload(BaseSchema):
     payload: RecommendationRefreshRequestData
 
 
+class RecommendationStreamingData(BaseSchema):
+    dining_id: int
+    user_id: int
+    content: str
+
+
+class RecommendationStreamingPayload(BaseSchema):
+    event_id: int
+    event_type: EventType
+    payload: RecommendationStreamingData
+
+
 # AI 회식 요청
 class DiscussionRequestData(BaseSchema):
     dining_data: DiningData
@@ -135,18 +151,6 @@ class DiscussionRequestPayload(BaseSchema):
     event_id: int
     event_type: EventType
     payload: DiscussionRequestData
-
-
-class RecommendationStreamingData(BaseSchema):
-    dining_id: int
-    user_id: int
-    content: str
-
-
-class RecommendationStreamingPayload(BaseSchema):
-    event_id: int
-    event_type: EventType
-    payload: RecommendationStreamingData
 
 
 # AI 회식 응답
