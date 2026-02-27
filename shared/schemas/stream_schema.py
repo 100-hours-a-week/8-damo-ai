@@ -77,7 +77,7 @@ class RecommendedItem(BaseSchema):
 
 
 class RecommendationResponseData(BaseSchema):
-    group_id: int
+    dining_id: int
     recommendation_count: int
     recommended_items: list[RecommendedItem]
 
