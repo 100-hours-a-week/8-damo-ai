@@ -102,9 +102,7 @@ async def handle_discussion_request(
         user_ids=req.user_ids,
         dining_data=req.dining_data.model_dump(),
         filtered_restaurant_ids=req.filtered_restaurant,
-        vote_result_list=[
-            v.model_dump(by_alias=False) for v in req.vote_result_list
-        ],
+        vote_result_list=[v.model_dump(by_alias=False) for v in req.vote_result_list],
     )
     graph = build_consensus_graph()
     config = {"configurable": {"on_persona_speak": on_persona_speak}}
@@ -118,7 +116,9 @@ async def handle_discussion_request(
             persona_vote_result_list=[],
         )
         await service.publish_ai_discussion_response(
-            event_id=event_id, key=key, data=error_data,
+            event_id=event_id,
+            key=key,
+            data=error_data,
         )
         return
 
@@ -131,13 +131,16 @@ async def handle_discussion_request(
                 break
             rid = str(r.get("_id", ""))
             if rid not in existing_ids:
-                final_selection.append({
-                    "restaurant_id": rid,
-                    "reason": f"{r.get('place_name', '')} — 후보 풀 기반 보충 선정",
-                })
+                final_selection.append(
+                    {
+                        "restaurant_id": rid,
+                        "reason": f"{r.get('place_name', '')} — 후보 풀 기반 보충 선정",
+                    }
+                )
                 existing_ids.add(rid)
 
     response_data = DiscussionResponseData(
+        dining_id=dining_id,
         final_restaurant_ids=[
             FinalRestaurant(
                 restaurant_id=item.get("restaurant_id", ""),
@@ -150,7 +153,9 @@ async def handle_discussion_request(
         ),
     )
     await service.publish_ai_discussion_response(
-        event_id=event_id, key=key, data=response_data,
+        event_id=event_id,
+        key=key,
+        data=response_data,
     )
 
     logger.info("Discussion completed: dining_id=%s", dining_id)
