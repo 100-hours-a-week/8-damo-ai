@@ -6,10 +6,8 @@ from faststream import FastStream, Context
 from shared.schemas.stream_schema import (
     DiscussionRequestPayload,
     DiscussionResponseData,
-    EventType,
     FinalRestaurant,
     RecommendationStreamingData,
-    RecommendationStreamingPayload,
     VoteResultData,
 )
 from shared.stream.service import KafkaService
@@ -92,16 +90,12 @@ async def handle_discussion_request(
 
     # 발언마다 recommendation-streaming 토픽에 publish 하는 콜백
     async def on_persona_speak(entry: dict) -> None:
-        payload = RecommendationStreamingPayload(
-            event_id=event_id,
-            event_type=EventType.RECOMMENDATION_STREAMING.value,
-            payload=RecommendationStreamingData(
-                dining_id=dining_id,
-                user_id=_safe_int(entry.get("user_id", 0)),
-                content=entry.get("content", ""),
-            ),
+        data = RecommendationStreamingData(
+            dining_id=dining_id,
+            user_id=_safe_int(entry.get("user_id", 0)),
+            content=entry.get("content", ""),
         )
-        await service.publish_recommendation_streaming(key=key, data=payload)
+        await service.publish_recommendation_streaming(event_id=event_id, data=data)
 
     # 그래프 실행
     initial_state = create_initial_state(
