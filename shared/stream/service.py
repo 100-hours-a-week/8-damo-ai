@@ -108,16 +108,17 @@ class KafkaService:
     
     async def publish_ai_discussion_request(self, event: RecommendationRequestPayload, message: KafkaMessage):
         incoming_headers = dict(message.headers) if message.headers else {}
+        
+        # 키 값 안전하게 추출
+        raw_key = message.raw_message.key
+        display_key = raw_key.decode('utf-8', errors='ignore') if raw_key else 'None'
+        
         await self._discussion_request_publisher.publish(
-            headers=incoming_headers, message=event, key=message.raw_message.key
+            headers=incoming_headers, 
+            message=event, 
+            key=raw_key
         )
-        print(
-            f"Service: Published ai discussion request for key {message.raw_message.key.decode('utf-8') if message.raw_message.key else 'None'}"
-            message=payload, key=f"{data.dining_id}-{data.user_id}".encode("utf-8")
-        )
-        print(
-            f"Service: Published recommendation streaming for key {data.dining_id}-{data.user_id}"
-        )
+        print(f"Service: Published ai discussion request for key {display_key}")
 
     # 이벤트 타입 수정 필요
     async def publish_receipt_ocr_response(self, event, message: KafkaMessage):
