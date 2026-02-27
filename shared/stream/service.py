@@ -10,7 +10,9 @@ from shared.schemas.stream_schema import (
     RecommendationResponsePayload,
 <<<<<<< HEAD
     RecommendationStreamingPayload,
+    RecommendationStreamingPayload,
     DiscussionRequestPayload,
+    DiscussionResponseData,
     DiscussionResponseData,
     DiscussionResponsePayload,
     RecommendationStreamingData,
@@ -90,6 +92,9 @@ class KafkaService:
         )
         self._recommendation_streaming_publisher = self.broker.publisher(
             TopicType.RECOMMENDATION_STREAMING.value
+        )
+        self._discussion_response_publisher = self.broker.publisher(
+            TopicType.DISCUSSION_RESPONSE.value
         )
         self._discussion_response_publisher = self.broker.publisher(
             TopicType.DISCUSSION_RESPONSE.value
