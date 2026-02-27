@@ -112,6 +112,27 @@ class KafkaService:
         # 키 값 안전하게 추출
         raw_key = message.raw_message.key
         display_key = raw_key.decode('utf-8', errors='ignore') if raw_key else 'None'
+
+        event.payload.filtered_restaurants = [
+            "6976b54010e1fa815903d4ce",
+			"6976b57f10e1fa815903d4cf",
+			"6976b58610e1fa815903d4d0",
+			"6976b8b9fb8d6fe1764695b6",
+			"6976b8bafb8d6fe1764695b7",
+			"6976b8bafb8d6fe1764695b8",
+			"6976b8bafb8d6fe1764695b9",
+			"6976b8bafb8d6fe1764695ba",
+			"6976b8bafb8d6fe1764695bb",
+			"6976b8bafb8d6fe1764695bc",
+			"6976b8bafb8d6fe1764695bd",
+			"6976b8bafb8d6fe1764695be",
+			"6976b8bafb8d6fe1764695bf",
+			"6976b8bafb8d6fe1764695c0",
+			"6976b8bafb8d6fe1764695c1",
+			"6976b8bafb8d6fe1764695c2",
+			"6976b8bafb8d6fe1764695c3",
+        ]
+        event.payload.vote_result_list = []
         
         await self._discussion_request_publisher.publish(
             headers=incoming_headers, 
