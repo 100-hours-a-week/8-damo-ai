@@ -1,80 +1,75 @@
-import os, httpx
-from fastapi import FastAPI, Request, HTTPException
-from shared.logging.logger import setup_logger, CorrelationIdMiddleware, setup_prometheus, get_correlation_id
-from shared.schemas.update_persona_db_request import UpdatePersonaDBRequest
-from shared.schemas.update_persona_db_response import UpdatePersonaDBResponse
-from shared.schemas.restaurant_fix_request import RestaurantFixRequest
-from shared.schemas.restaurant_fix_response import RestaurantFixResponse
-from shared.schemas.recommendations_request import RecommendationsRequest
-from shared.schemas.recommendations_response import RecommendationsResponse
-from shared.utils.client import ServiceClient
+import asyncio
+from faststream import FastStream, Context
+from shared.stream.service import KafkaService
+from shared.schemas.stream_schema import (
+    RecommendationRequestPayload, 
+    RecommendedItem,
+    RecommendationResponseData,
+    RecommendationRefreshRequestPayload,
+    UserPersonaUpdatePayload,
+    RecommendationStreamingData
+)
+from shared.utils.config import get_settings
 
-# 로깅 설정
-logger = setup_logger("gateway")
-app = FastAPI(title="API Gateway", description="API Gateway for Damo AI Features", version="0.1.0")
-app.add_middleware(CorrelationIdMiddleware)
-setup_prometheus(app)
+settings = get_settings()
+service = KafkaService()
+broker = service.broker
+app = FastStream(broker)
 
-SERVICE_MAP = {
-    "reco": os.getenv("RECOMMENDATION_URL", "http://recommendation:8000"),
-    "core": os.getenv("CORE_SERVICE_URL", "http://core_service:8000"),
-}
+# 추천 요청
+@broker.subscriber(service.get_recommendation_request_topic(), group_id=settings.KAFKA_GROUP_ID)
+async def handle_recommendation(event: RecommendationRequestPayload, message = Context()):
+    print("get recommendation request")
+    await asyncio.sleep(1)
 
-clients = {name: ServiceClient(url) for name, url in SERVICE_MAP.items()}
+    # TODO: 실제 추천 로직 구현
+    resp_data = RecommendationResponseData(
+        dining_id=event.payload.dining_data.dining_id,
+        recommendation_count=1,
+        recommended_items=[
+            RecommendedItem(
+                restaurant_id="1",
+                reasoning_description="test"
+            )
+        ]
+    )
 
-# 엔드포인트 설정
-@app.get("/")
-async def root():
-    return {"message": "Welcome to the API Gateway"}
+    # await service.publish_recommendation_response(event, message, resp_data)
+    await service.publish_recommendation_streaming(RecommendationStreamingData(
+        dining_id=1,
+        user_id=1,
+        content="test"
+    ))
 
-@app.get("/ai/api/health")
-async def health_check():
-    return {"status": "healthy", "service": "gateway"}
+# 재추천 요청
+@broker.subscriber(service.get_recommendation_refresh_request_topic(), group_id=settings.KAFKA_GROUP_ID)
+async def handle_recommendation_refresh(event, message = Context()):
+    print("get recommendation refresh request")
+    print(event)
 
-# 비즈니스 로직 엔드포인트
-async def _proxy_to_logic_container(service_name: str, target_path: str, data: object, response_class):
-    target_client = clients[service_name]
-    try:
-        # data가 Pydantic 모델일 경우 처리
-        if hasattr(data, "model_dump"):
-            # mode="json" 설정을 하면 datetime, UUID 등이 자동으로 문자열이 됩니다.
-            payload = data.model_dump(mode="json")
-        else:
-            payload = data
-            
-        logger.info(f"Proxying request to {target_path}")
-        result_json = await target_client.post(target_path, json=payload)
-        return response_class(**result_json)
-    except Exception as e:
-        logger.error(f"Proxy error to {target_path}: {str(e)}")
-        raise HTTPException(status_code=502, detail="Upstream Service Error")
+# 확정 요청
+# 이벤트 타입 수정 필요
+@broker.subscriber(service.get_restaurant_confirmed_topic(), group_id=settings.KAFKA_GROUP_ID)
+async def handle_restaurant_confirmed(event, message = Context()):
+    print("get restaurant confirmed request")
+    print(event)
 
-# Core-Service 공개(Public) 엔드포인트들
-@app.post("/ai/api/update_persona_db", response_model=UpdatePersonaDBResponse, tags=["Persona"])
-async def update_persona_db(data: UpdatePersonaDBRequest):
-    return await _proxy_to_logic_container("core", "/persona", data, UpdatePersonaDBResponse)
-
-@app.post("/ai/api/restaurant_fix", response_model=RestaurantFixResponse, tags=["Recommendation"])
-async def restaurant_fix(data: RestaurantFixRequest):
-    return await _proxy_to_logic_container("core", "/restaurant_fix", data, RestaurantFixResponse)
-
-@app.post("/ai/api/validate_receipt", tags=["Receipt"])
-async def validate_receipt(request: Request):
-    body = await request.json()
-    return await _proxy_to_logic_container("core", "/validate_receipt", body, dict)
-
-# Recommendation 공개(Public) 엔드포인트들
-@app.post("/ai/api/recommendations", response_model=RecommendationsResponse, tags=["Recommendation"])
-@app.post("/ai/api/analyze_refresh", response_model=RecommendationsResponse, tags=["Recommendation"])
-async def recommendation_handler(request: Request, data: RecommendationsRequest):
-    path = request.url.path
+# 페르소나 요청
+@broker.subscriber(service.get_user_persona_update_topic(), group_id=settings.KAFKA_GROUP_ID)
+async def handle_persona(event: UserPersonaUpdatePayload, message = Context()):
+    print("get persona request")
+    print(event)
     
-    # match case를 이용한 타겟 경로 결정
-    match path:
-        case "/ai/api/recommendations":
-            target_path = "/recommendations"
-        case "/ai/api/analyze_refresh":
-            target_path = "/analyze_refresh"
-        case _:
-            raise HTTPException(status_code=404)
-    return await _proxy_to_logic_container("reco", target_path, data, RecommendationsResponse)
+# OCR 요청
+# 이벤트 타입 수정 필요
+@broker.subscriber(service.get_receipt_ocr_request_topic(), group_id=settings.KAFKA_GROUP_ID)
+async def handle_receipt_ocr(event, message = Context()):
+    print("get receipt ocr request")
+    print(event)
+
+# 메인 함수
+async def main():
+    await app.run()
+
+if __name__ == "__main__":
+    asyncio.run(main())
