@@ -14,12 +14,8 @@ class DBManager:
         current_uri = uri or settings.MONGODB_URI
         current_db_name = db_name or settings.DB_NAME
 
-        # 1. 비동기 클라이언트 생성 (연결 타임아웃 2초로 제한)
-        self.client = AsyncIOMotorClient(
-            current_uri,
-            serverSelectionTimeoutMS=2000,
-            connectTimeoutMS=2000
-        )
+        # 1. 비동기 클라이언트 생성
+        self.client = AsyncIOMotorClient(current_uri)
         self.db = self.client[current_db_name]
         self.collection = self.db[col_name] if col_name else None
 
