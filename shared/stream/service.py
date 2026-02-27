@@ -62,6 +62,9 @@ class KafkaService:
         self._recommendation_streaming_publisher = self.broker.publisher(
             TopicType.RECOMMENDATION_STREAMING.value
         )
+        self._discussion_request_publisher = self.broker.publisher(
+            TopicType.DISCUSSION_REQUEST.value
+        )
         self._discussion_response_publisher = self.broker.publisher(
             TopicType.DISCUSSION_RESPONSE.value
         )
@@ -97,6 +100,19 @@ class KafkaService:
             payload=data,
         )
         await self._recommendation_streaming_publisher.publish(
+            message=data, key=f"{data.dining_id}-{data.user_id}".encode("utf-8")
+        )
+        print(
+            f"Service: Published recommendation streaming for key {data.dining_id}-{data.user_id}"
+        )
+    
+    async def publish_ai_discussion_request(self, event: RecommendationRequestPayload, message: KafkaMessage):
+        incoming_headers = dict(message.headers) if message.headers else {}
+        await self._discussion_request_publisher.publish(
+            headers=incoming_headers, message=event, key=message.raw_message.key
+        )
+        print(
+            f"Service: Published ai discussion request for key {message.raw_message.key.decode('utf-8') if message.raw_message.key else 'None'}"
             message=payload, key=f"{data.dining_id}-{data.user_id}".encode("utf-8")
         )
         print(
@@ -160,6 +176,9 @@ class KafkaService:
 
     def get_receipt_ocr_request_topic(self):
         return TopicType.RECEIPT_OCR_REQUEST.value
+
+    def get_ai_discussion_response_topic(self):
+        return TopicType.DISCUSSION_RESPONSE.value
 
     def get_ai_discussion_request_topic(self):
         return TopicType.DISCUSSION_REQUEST.value

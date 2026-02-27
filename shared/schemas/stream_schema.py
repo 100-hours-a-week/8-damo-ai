@@ -160,6 +160,7 @@ class FinalRestaurant(BaseSchema):
 
 
 class DiscussionResponseData(BaseSchema):
+    dining_id: int
     final_restaurant_ids: list[FinalRestaurant]
     persona_vote_result_list: list[VoteResultData]
 
