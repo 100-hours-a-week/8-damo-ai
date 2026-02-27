@@ -8,11 +8,11 @@ from shared.schemas.stream_schema import (
     RecommendationRequestPayload,
     RecommendationResponseData,
     RecommendationResponsePayload,
+    RecommendationStreamingData,
     RecommendationStreamingPayload,
     DiscussionRequestPayload,
     DiscussionResponseData,
     DiscussionResponsePayload,
-    RecommendationStreamingData,
     EventType,
     TopicType,
 )
@@ -91,7 +91,14 @@ class KafkaService:
             f"Service: Published recommendation response for key {message.raw_message.key.decode('utf-8') if message.raw_message.key else 'None'}"
         )
 
-    async def publish_recommendation_streaming(self, data: RecommendationStreamingData):
+    async def publish_recommendation_streaming(
+        self, event_id: int, data: RecommendationStreamingData,
+    ):
+        payload = RecommendationStreamingPayload(
+            event_id=event_id,
+            event_type=EventType.RECOMMENDATION_STREAMING.value,
+            payload=data,
+        )
         await self._recommendation_streaming_publisher.publish(
             message=data, key=f"{data.dining_id}-{data.user_id}".encode("utf-8")
         )
@@ -106,6 +113,10 @@ class KafkaService:
         )
         print(
             f"Service: Published ai discussion request for key {message.raw_message.key.decode('utf-8') if message.raw_message.key else 'None'}"
+            message=payload, key=f"{data.dining_id}-{data.user_id}".encode("utf-8")
+        )
+        print(
+            f"Service: Published recommendation streaming for key {data.dining_id}-{data.user_id}"
         )
 
     # 이벤트 타입 수정 필요

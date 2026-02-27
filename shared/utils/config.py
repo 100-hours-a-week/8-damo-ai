@@ -1,12 +1,17 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+
 class Settings(BaseSettings):
     GOOGLE_API_KEY: str
     GEMINI_MODEL: str = "gemini-3-flash-preview"
     OPENAI_API_KEY: str
     OPENAI_MODEL: str = "gpt-4o-mini"
+    OPENAI_BASE_URL: str = ""
     MONGODB_URI: str
     DB_NAME: str = "damo"
+    LOCAL_MODEL: str = ""
+    LOCAL_BASE_URL: str = ""
+    LOCAL_API_KEY: str = ""
     LANGFUSE_SECRET_KEY: str
     LANGFUSE_PUBLIC_KEY: str
     LANGFUSE_BASE_URL: str
@@ -26,5 +31,9 @@ class Settings(BaseSettings):
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
+
+settings = Settings()
+
+
 def get_settings() -> Settings:
-    return Settings()
+    return settings
