@@ -20,6 +20,7 @@ def _build_persona_prompt(user: Dict[str, Any]) -> str:
         nickname=user.get("nickname", "익명"),
         base_persona=base_persona or "정보 없음",
         allergies=allergies,
+        vote_feedback="",
     )
 
 
