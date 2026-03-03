@@ -11,4 +11,6 @@ pytest
 pytest-asyncio
 faststream[kafka]
 faststream[cli]
-prometheus-fastapi-instrumentator
+uvicorn
+boto3
+google-cloud-vision

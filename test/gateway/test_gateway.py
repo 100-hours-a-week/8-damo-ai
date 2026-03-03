@@ -1,6 +1,7 @@
 import pytest
+from unittest.mock import patch, MagicMock, AsyncMock
 from faststream.kafka import TestKafkaBroker
-from gateway.main import broker, handle_recommendation
+from gateway.main import broker
 from shared.schemas.stream_schema import (
     RecommendationRequestPayload,
     EventType,
@@ -11,9 +12,21 @@ from datetime import datetime
 
 @pytest.mark.asyncio
 async def test_handle_recommendation():
-    # 1. TestKafkaBroker를 사용하여 실제 Kafka 없이 테스트 모드 진입
-    async with TestKafkaBroker(broker) as br:
-        # 2. 테스트용 데이터 준비
+    # 💡 핵심: 외부 의존성을 모두 Mock 처리하여 실제 DB/API 호출을 막음
+    with patch("gateway.main.runpod.health_check", new_callable=AsyncMock) as mock_health, \
+         patch("gateway.main.DBManager") as mock_db, \
+         patch("gateway.main.recommendation_task") as mock_task:
+        
+        # 가짜 응답 설정
+        mock_health.return_value = True
+        
+        mock_task.return_value = {
+            "filtered_restaurant": [{"_id": "69783c8e8f56cf41f4e93109"}],
+            "iteration_count": 1,
+            "needs_discussion": True
+        }
+
+        # 테스트용 데이터 준비
         test_payload = RecommendationRequestPayload(
             event_id=1,
             event_type=EventType.RECOMMENDATION_REQUEST,
@@ -30,13 +43,9 @@ async def test_handle_recommendation():
             )
         )
 
-        # 3. 특정 토픽으로 메시지 발행 (main.py의 서비스 토픽 사용)
-        # br.publish를 호출하면 @broker.subscriber가 달린 함수가 즉시 실행됩니다.
-        await br.publish(
-            test_payload, 
-            topic="recommendation-request", # 실제 토픽 명 혹은 service.get_..._topic() 사용
-            key=b"test-key"
-        )
-        
-        # 4. (선택 사항) 핸들러 내의 부수 효과(DB 저장, 응답 발행 등)를 검증
-        # 이 예시에서는 에러 없이 실행되는지만 확인합니다.
+        async with TestKafkaBroker(broker) as br:
+            await br.publish(test_payload, topic="recommendation-request")
+            
+            # 핸들러가 비동기로 실행되므로 잠시 대기하거나 호출 여부 확인
+            # TestKafkaBroker는 publish 호출 시 구독 중인 핸들러를 실행함
+            mock_task.assert_called()
