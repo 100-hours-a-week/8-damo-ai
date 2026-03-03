@@ -12,17 +12,17 @@ env:
   KEY: ${{ secrets.AI_SERVER_KEY }}
   HOST: ${{ github.ref == 'refs/heads/main' && secrets.AI_PROD_SERVER_HOST || secrets.AI_DEV_SERVER_HOST }}
 
-  AWS_REGION: ap-northeast-2
   ECR_REGISTRY: ${{ secrets.ECR_REGISTRY }}
   ECR_REPO_DEV: dev/ai
   ECR_REPO_PROD: prod/ai
+  
+  AWS_REGION: ap-northeast-2
 
   DEPLOYMENT_APP: damo-ai
   DEPLOYMENT_GROUP_DEV: dev-damo-ai
   DEPLOYMENT_GROUP_PROD: prod-damo-ai
 
 jobs:
-  # 1. 테스트 단계: 코드가 안전한지 먼저 검증 (도커 빌드 전 실행)
   ci:
     runs-on: ubuntu-latest
     steps:
@@ -40,7 +40,7 @@ jobs:
       - name: Run Gateway Tests
         env:
             GOOGLE_API_KEY: ${{secrets.GOOGLE_API_KEY}}
-            OPENAI_API_KEY: ${{secrets.OPENAI_API_KEY}}ㅣ
+            OPENAI_API_KEY: ${{secrets.OPENAI_API_KEY}}
             MONGODB_URI: ${{ secrets.MONGODB_URI}}
             LANGFUSE_SECRET_KEY: ${{secrets.LANGFUSE_SECRET_KEY}}
             LANGFUSE_PUBLIC_KEY: ${{secrets.LANGFUSE_PUBLIC_KEY}}
@@ -55,15 +55,13 @@ jobs:
             OPENROUTER_MODEL: "dummy"
             KAFKA_BOOTSTRAP_SERVERS: "localhost:9092"
         run: |
-            # PYTHONPATH 설정 후 게이트웨이 전용 테스트 실행
             export PYTHONPATH=$PYTHONPATH:$(pwd)
             python -m pytest test/gateway/test_gateway.py
 
-  # 2. 빌드 및 배포 단계: 테스트가 성공했을 때만 실행
   build_and_push:
     needs: ci
     runs-on: ubuntu-latest
-
+    if: github.event_name == 'push'
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -73,7 +71,7 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
+          aws-region: ap-northeast-2
 
       - name: Login to Amazon ECR
         uses: aws-actions/amazon-ecr-login@v2
@@ -86,8 +84,8 @@ jobs:
           else
             ECR_REPO="${{ env.ECR_REGISTRY }}/${{ env.ECR_REPO_DEV }}"
           fi
-          echo "IMAGE=${ECR_REPO}:${SHORT_SHA}" >> "$GITHUB_ENV"
-          echo "LATEST_IMAGE=${ECR_REPO}:latest" >> "$GITHUB_ENV"
+          echo "ECR_REPO=${ECR_REPO}" >> "$GITHUB_ENV"
+          echo "IMAGE_TAG=${SHORT_SHA}" >> "$GITHUB_ENV"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
