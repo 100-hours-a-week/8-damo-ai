@@ -138,6 +138,39 @@ class RecommendationStreamingPayload(BaseSchema):
     event_type: EventType
     payload: RecommendationStreamingData
 
+# 장소 확정 페이로드
+class RestaurantConfirmedData(BaseSchema):
+    dining_data: DiningData
+    restaurant_id: str
+    vote_result_list: list[VoteResultData]
+
+class RestaurantConfirmedPayload(BaseSchema):
+    event_id: int
+    event_type: EventType
+    payload: RestaurantConfirmedData
+
+# 영수증 OCR 요청/응답 페이로드
+class ReceiptOCRRequestData(BaseSchema):
+    image_url: Optional[str] = None
+    image_base64: Optional[str] = None
+
+
+class ReceiptOCRRequestPayload(BaseSchema):
+    event_id: int
+    event_type: EventType
+    payload: ReceiptOCRRequestData
+
+
+class ReceiptOCRResponseData(BaseSchema):
+    full_text: str
+    process_time: float
+
+
+class ReceiptOCRResponsePayload(BaseSchema):
+    event_id: int
+    event_type: EventType
+    payload: ReceiptOCRResponseData
+
 
 # AI 회식 요청
 class DiscussionRequestData(BaseSchema):

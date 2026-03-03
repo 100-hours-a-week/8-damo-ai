@@ -34,8 +34,8 @@ class RecommendationState(TypedDict):
     user_ids: List[int]
     dining_id: int
     dining_data: dict
-    filtered_restaurants: List[dict]
-    rejected_restaurants: List[dict]
+    filtered_restaurant: List[dict]
+    rejected_restaurant: List[dict]
     current_recommendation: dict
     personas: List[dict]
 
