@@ -150,7 +150,7 @@ jobs:
              echo '' >> /home/ubuntu/.env && \
              echo 'ECR_REPO=${{ env.ECR_REPO }}' >> /home/ubuntu/.env && \
              echo 'IMAGE_TAG=${{ env.IMAGE_TAG }}' >> /home/ubuntu/.env && \
-             aws ecr get-login-password --region ap-northeast-2 | sudo docker login --username AWS --password-stdin ${{ env.ECR_REGISTRY }} && \
+             aws ecr get-login-password --region ap-northeast-2 | docker login --username AWS --password-stdin ${{ env.ECR_REGISTRY }} && \
              cd /home/ubuntu && sudo docker compose pull gateway && sudo docker compose up -d gateway"
           rm -f /tmp/deploy_key
 
