@@ -15,14 +15,19 @@ class BucketManager:
         self.access_key = os.getenv('AWS_ACCESS_KEY_ID')
         self.secret_key = os.getenv('AWS_SECRET')
         self.bucket_name = os.getenv('AWS_BUCKET_NAME')
+        self._s3_client = None
 
-        self.s3 = boto3.client(
-            's3',
-            endpoint_url=self.endpoint_url,
-            aws_access_key_id=self.access_key,
-            aws_secret_access_key=self.secret_key,
-            config=Config(s3={'addressing_style': 'path'})
-        )
+    @property
+    def s3(self):
+        if self._s3_client is None:
+            self._s3_client = boto3.client(
+                's3',
+                endpoint_url=self.endpoint_url,
+                aws_access_key_id=self.access_key,
+                aws_secret_access_key=self.secret_key,
+                config=Config(s3={'addressing_style': 'path'})
+            )
+        return self._s3_client
 
     def list_objects(self, prefix='prompts/'):
         """특정 경로내의 파일 목록 조회"""
