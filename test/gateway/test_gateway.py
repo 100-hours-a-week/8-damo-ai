@@ -13,14 +13,12 @@ from datetime import datetime
 @pytest.mark.asyncio
 async def test_handle_recommendation():
     # 💡 핵심: 외부 의존성을 모두 Mock 처리하여 실제 DB/API 호출을 막음
-    with patch("gateway.main.RunPodClient") as mock_runpod, \
+    with patch("gateway.main.runpod.health_check", new_callable=AsyncMock) as mock_health, \
          patch("gateway.main.DBManager") as mock_db, \
          patch("gateway.main.recommendation_task") as mock_task:
         
         # 가짜 응답 설정
-        # health_check가 비동기 함수인 경우 AsyncMock 사용
-        mock_runpod_instance = mock_runpod.return_value
-        mock_runpod_instance.health_check = AsyncMock(return_value=True)
+        mock_health.return_value = True
         
         mock_task.return_value = {
             "filtered_restaurant": [{"_id": "69783c8e8f56cf41f4e93109"}],
