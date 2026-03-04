@@ -22,7 +22,7 @@ from shared.schemas.update_persona_db_request import UpdatePersonaDBRequest
 from shared.utils.config import get_settings
 
 # ASGI 및 클라이언트 접속을 위한 모듈
-from services.core_service.modules.web_connections import health_check, log_check
+from services.core_service.modules.web_connections import health_check, log_check, lightning_request
 from services.core_service.modules.runpod_connections import RunPodClient
 
 # 서브 그래프
@@ -42,8 +42,9 @@ broker = service.broker
 app = AsgiFastStream(
     broker,
     asgi_routes=[
-        ("/health_check", health_check),
-        ("/log_check", log_check)
+        ("/ai/health_check", health_check),
+        ("/ai/log_check", log_check),
+        ("/ai/lightning_request", lightning_request)
     ]
 )
 runpod = RunPodClient()
@@ -248,6 +249,20 @@ async def handle_receipt_ocr(event: ReceiptOCRRequestPayload, logger: Logger, me
         logger.error(f"Critical error in receipt ocr handler: {e}")
         raise e
 # ------------------------------------------------
+# 7. 번개 요청
+# @broker.subscriber(, group_id=settings.KAFKA_GROUP_ID)
+# async def handle_lightning_request(event:, logger: Logger, message = Context()):
+#     logger.info("get lightning ocr request")
+#     try:
+#         payload = event.payload
+#         # mockup
+#         # 도치피자(6976b54010e1fa815903d4ce)
+#         # await service.publish_receipt_ocr_response(payload, message)
+#     except Exception as e:
+#         logger.error(f"Critical error in receipt ocr handler: {e}")
+#         raise e
+# ----------------
+
 
 @app.after_shutdown
 async def cleanup():
