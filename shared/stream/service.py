@@ -101,7 +101,7 @@ class KafkaService:
             payload=data,
         )
         await self._recommendation_streaming_publisher.publish(
-            message=data, key=f"{data.dining_id}-{data.user_id}".encode("utf-8")
+            message=payload, key=f"{data.dining_id}-{data.user_id}".encode("utf-8")
         )
         print(
             f"Service: Published recommendation streaming for key {data.dining_id}-{data.user_id}"

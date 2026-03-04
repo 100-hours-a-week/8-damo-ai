@@ -1,7 +1,7 @@
 import json
 import logging
 import os
-from faststream.asgi import AsgiResponse, get
+from faststream.asgi import AsgiResponse, get, post, Request
 from faststream.asgi.types import Scope
 
 LOG_FILE = "faststream_web.log"
@@ -60,3 +60,22 @@ async def log_check(scope: Scope) -> AsgiResponse:
         )
     except Exception as e:
         return AsgiResponse(f"Error reading logs: {e}".encode("utf-8"), status_code=500)
+
+@post
+async def lightning_request(request: Request) -> AsgiResponse:
+    payload = await request.json()
+    result = {
+        "restaurantId": "6976b54010e1fa815903d4ce",
+        "restaurantName": "도치피자 고기리점",
+        "x": "127.067855515046",    
+        "y": "37.3604867088462",
+        "phone": "031-717-9463"
+    }
+    print(payload)
+    body = json.dumps(result).encode("utf-8")
+
+    return AsgiResponse(
+        body, 
+        status_code=200,
+        headers={"content-type": "application/json"}
+    )
