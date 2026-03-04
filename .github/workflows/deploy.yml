@@ -54,6 +54,9 @@ jobs:
             OPENROUTER_API_KEY: "dummy"
             OPENROUTER_MODEL: "dummy"
             KAFKA_BOOTSTRAP_SERVERS: "localhost:9092"
+            RUNPOD_API_KEY: ${{ secrets.RUNPOD_API_KEY }}
+            RUNPOD_API_URL: ${{ secrets.RUNPOD_API_URL }}
+            GOOGLE_CREDENTIALS_JSON: ${{ secrets.GOOGLE_CREDENTIALS_JSON }}
         run: |
             export PYTHONPATH=$PYTHONPATH:$(pwd)
             python -m pytest test/gateway/test_gateway.py
