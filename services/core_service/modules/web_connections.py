@@ -75,16 +75,17 @@ async def log_check(scope: Scope) -> AsgiResponse:
 @post
 async def lightning_request(request: Request) -> AsgiResponse:
     payload = await request.json()
-    result = {
-        "restaurantId": "6976b54010e1fa815903d4ce",
-        "restaurantName": "도치피자 고기리점",
-        "x": "127.067855515046",
-        "y": "37.3604867088462",
-        "phoneNumber": "031-717-9463",
-    }
-    print(payload)
+
+    from services.core_service.modules.lightning.task import lightning_task
+    result = await lightning_task(payload, correlation_id="1234567890")
+    
     body = json.dumps(result).encode("utf-8")
 
     return AsgiResponse(
         body, status_code=200, headers={"content-type": "application/json"}
     )
+
+
+# userId, x, y, lightningDate
+
+# curl -X POST "http://localhost:8080/ai/lightning_request" -H "Content-Type: application/json" -d "{\"userId\": \"9970079\", \"x\": \"127.109674977769\", \"y\": \"37.3919279358062\"}"

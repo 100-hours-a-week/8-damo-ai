@@ -28,7 +28,7 @@ def setup_logger(name: str):
     logger = logging.getLogger(name)
     logger.setLevel(logging.INFO)
     handler = logging.StreamHandler()
-    formatter = logging.Formatter('[%(asctime)s] [%(levelname)s] [%(correlation_id)s] [%(name)s] %(message)s')
+    formatter = logging.Formatter('[%(levelname)s] [%(correlation_id)s] [%(name)s] %(message)s')
     handler.setFormatter(formatter)
     handler.addFilter(CorrelationIdFilter())
     if not logger.handlers:
