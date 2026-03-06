@@ -2,6 +2,8 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Tuple
 
+from langfuse import observe
+
 from shared.database.db_manager import DBManager
 from services.iterative_discussion.app.engine.state import ConsensusState
 
@@ -149,11 +151,14 @@ def _format_vote_feedback(
     return "\n".join(lines)
 
 
+@observe(name="self_evolution")
 async def self_evolution(state: ConsensusState) -> dict:
     """재추천 시 이전 가상투표 vs 실제 투표를 비교하여 few-shot 피드백을 프롬프트에 주입."""
+    logger.info("[Node2] self_evolution 시작")
     try:
         vote_result_list = state.get("vote_result_list", [])
         if not vote_result_list:
+            logger.info("[Node2] 초기 추천 — self_evolution 스킵")
             return {}  # 초기 추천이면 스킵
 
         dining_data = state.get("dining_data", {})
@@ -204,8 +209,10 @@ async def self_evolution(state: ConsensusState) -> dict:
             )
 
         if not updated:
+            logger.info("[Node2] self_evolution: 업데이트할 피드백 없음, 스킵")
             return {}
 
+        logger.info("[Node2] self_evolution 완료: 페르소나 프롬프트 업데이트됨")
         return {"persona_prompts": persona_prompts}
     except Exception:
         logger.warning("self_evolution 실패, 보정 스킵", exc_info=True)

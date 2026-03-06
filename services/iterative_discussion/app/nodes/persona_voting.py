@@ -4,10 +4,14 @@ import re
 from typing import Any, Dict, List
 
 from langchain_core.messages import HumanMessage, SystemMessage
+from langfuse import get_client, observe
+from services.iterative_discussion.app.prompts.langfuse_prompts import make_callback_handler
 
 from services.iterative_discussion.app.engine.llm_factory import get_chat_llm
 from services.iterative_discussion.app.engine.state import ConsensusState
+from services.iterative_discussion.app.prompts.langfuse_prompts import get_prompt
 from services.iterative_discussion.app.prompts.voting_templates import VOTING_PROMPT
+from shared.utils.config import settings
 
 
 logger = logging.getLogger(__name__)
@@ -126,15 +130,22 @@ def _tally_votes(
     return results
 
 
+@observe(name="persona_voting")
 async def persona_voting(state: ConsensusState) -> dict:
-    """Node 5: 최종 5개 식당에 대한 페르소나 투표 + 순위 정렬."""
+    """Node 6: 최종 5개 식당에 대한 페르소나 투표 + 순위 정렬."""
     persona_prompts = state.get("persona_prompts", {})
     consensus_candidates = state.get("consensus_candidates", [])
     dialogue_history = state.get("dialogue_history", [])
     candidate_pool = state.get("candidate_pool", [])
     user_data_list = state.get("user_data_list", [])
 
+    logger.info(
+        "[Node6] persona_voting 시작: 합의 후보=%d개, 페르소나=%d명",
+        len(consensus_candidates),
+        len(persona_prompts),
+    )
     if not consensus_candidates:
+        logger.warning("[Node6] consensus_candidates가 비어있어 에러 반환")
         return {"is_error": True, "error_message": "consensus_candidates가 비어있습니다."}
 
     # 유저 ID → 닉네임 매핑
@@ -147,23 +158,31 @@ async def persona_voting(state: ConsensusState) -> dict:
     dialogue_summary = _format_dialogue_summary(dialogue_history)
 
     llm = get_chat_llm(temperature=0.7)
+    get_client().update_current_span(metadata={"tags": ["persona_voting", settings.OPENAI_MODEL]})
 
     all_votes: List[Dict[str, Any]] = []
 
     for user_id, system_prompt in persona_prompts.items():
         nickname = id_to_nickname.get(user_id, "익명")
 
-        user_prompt = VOTING_PROMPT.format(
-            nickname=nickname,
-            candidate_list=candidate_text,
-            dialogue_summary=dialogue_summary,
+        prompt_vars = {
+            "nickname": nickname,
+            "candidate_list": candidate_text,
+            "dialogue_summary": dialogue_summary,
+        }
+        user_prompt, lf_prompt = get_prompt(
+            "persona-voting",
+            VOTING_PROMPT,
+            **prompt_vars,
         )
 
+        lf_handler = make_callback_handler()
+        lf_config = {"callbacks": [lf_handler], "metadata": {"user_id": user_id}}
         try:
             response = await llm.ainvoke([
                 SystemMessage(content=system_prompt),
                 HumanMessage(content=user_prompt),
-            ])
+            ], config=lf_config)
         except Exception:
             logger.warning("투표 LLM 호출 실패: user_id=%s", user_id, exc_info=True)
             votes = []
@@ -205,6 +224,11 @@ async def persona_voting(state: ConsensusState) -> dict:
     else:
         final_decision = "최종 선정 실패"
 
+    logger.info(
+        "[Node6] persona_voting 완료: 최종=%d개, 결정=%s",
+        len(final_selection),
+        final_decision,
+    )
     return {
         "persona_votes": all_votes,
         "final_selection": final_selection,

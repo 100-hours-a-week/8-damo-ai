@@ -1,7 +1,10 @@
 import logging
+import time
+from importlib.metadata import version
 from typing import Any
 
 from faststream import FastStream, Context
+from langfuse import observe
 
 from shared.schemas.stream_schema import (
     DiscussionRequestPayload,
@@ -14,10 +17,22 @@ from shared.schemas.stream_schema import (
 )
 from shared.stream.service import KafkaService
 
+from services.iterative_discussion.app.utils.logging_config import setup_logging
+
+setup_logging()  # 반드시 monitoring import 전에 호출
+logger = logging.getLogger(__name__)
+
+import services.iterative_discussion.app.utils.monitoring  # noqa: F401 — Langfuse 환경변수 주입
+
 from services.iterative_discussion.app.engine.graph import build_consensus_graph
 from services.iterative_discussion.app.engine.state import create_initial_state
 
-logger = logging.getLogger(__name__)
+logger.info(
+    "[Startup] langfuse==%s, langgraph==%s, langchain==%s",
+    version("langfuse"),
+    version("langgraph"),
+    version("langchain"),
+)
 
 service = KafkaService()
 broker = service.broker
@@ -35,11 +50,7 @@ def _safe_int(value: Any) -> int:
 def _aggregate_persona_votes(
     persona_votes: list[dict[str, Any]],
 ) -> list[VoteResultData]:
-    """per-user votes를 per-restaurant VoteResultData로 집계 변환.
-
-    그래프 출력: [{user_id, votes: [{restaurant_id, approve, ...}]}]
-    스키마 기대: [{restaurant_id, like_count, dislike_count, liked_user_ids, disliked_user_ids}]
-    """
+    """per-user votes를 per-restaurant VoteResultData로 집계 변환."""
     restaurant_map: dict[str, dict[str, Any]] = {}
 
     for vote_entry in persona_votes:
@@ -74,6 +85,7 @@ def _aggregate_persona_votes(
 
 
 @broker.subscriber(service.get_ai_discussion_request_topic())
+@observe(name="llm_talks")
 async def handle_discussion_request(
     event: DiscussionRequestPayload,
     message=Context(),
@@ -85,9 +97,10 @@ async def handle_discussion_request(
     dining_id = req.dining_data.dining_id
 
     logger.info(
-        "Received discussion request: dining_id=%s, event_id=%s",
+        "[START] discussion request 수신: dining_id=%s, event_id=%s, users=%s",
         dining_id,
         event_id,
+        req.user_ids,
     )
 
     # 발언마다 recommendation-streaming 토픽에 publish 하는 콜백
@@ -114,10 +127,15 @@ async def handle_discussion_request(
     graph = build_consensus_graph()
     config = {"configurable": {"on_persona_speak": on_persona_speak}}
 
+    logger.info("[GRAPH] 합의 그래프 실행 시작: dining_id=%s", dining_id)
+    t0 = time.monotonic()
     try:
         result = await graph.ainvoke(initial_state, config=config)
     except Exception:
-        logger.exception("Discussion graph failed: dining_id=%s", dining_id)
+        elapsed = time.monotonic() - t0
+        logger.exception(
+            "[GRAPH] 합의 그래프 실패: dining_id=%s (%.1fs 경과)", dining_id, elapsed
+        )
         error_data = DiscussionResponseData(
             dining_id=dining_id,
             final_restaurant_ids=[],
@@ -166,4 +184,10 @@ async def handle_discussion_request(
         data=response_data,
     )
 
-    logger.info("Discussion completed: dining_id=%s", dining_id)
+    elapsed = time.monotonic() - t0
+    logger.info(
+        "[DONE] 합의 완료: dining_id=%s, 최종 선정=%d개, 소요=%.1fs",
+        dining_id,
+        len(response_data.final_restaurant_ids),
+        elapsed,
+    )

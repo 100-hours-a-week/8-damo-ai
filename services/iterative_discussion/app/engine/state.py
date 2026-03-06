@@ -2,8 +2,6 @@ from typing import Any, Dict, List, Optional, TypedDict
 
 from langchain_core.messages import BaseMessage
 
-from services.iterative_discussion.app.utils.monitoring import init_consensus_trace
-
 
 class ConsensusState(TypedDict):
     """협의 엔진 전용 State — shared/state 수정 없이 독립 운영"""
@@ -26,6 +24,9 @@ class ConsensusState(TypedDict):
     # Node 2 출력
     candidate_pool: List[Dict[str, Any]]
 
+    # Node 2.5 출력 (restaurant_summarizer)
+    candidate_summaries: Dict[str, str]  # restaurant _id(str) → 자연어 요약
+
     # Node 3 출력
     round: int
     messages: List[BaseMessage]
@@ -41,9 +42,6 @@ class ConsensusState(TypedDict):
     persona_votes: List[Dict[str, Any]]
     final_selection: List[Dict[str, Any]]
     final_decision: str
-
-    # 모니터링
-    langfuse_trace_id: str
 
     # 에러 처리
     is_error: bool
@@ -67,12 +65,6 @@ def create_initial_state(
     # min_rounds가 max_rounds 이상이면 합의 판정 기회가 0이 됨 — 방어
     min_rounds = min(min_rounds, max_rounds - 1)
 
-    session_id = str(dining_data.get("diningId") or dining_data.get("dining_id") or "")
-    trace_id = init_consensus_trace(
-        session_id=session_id,
-        metadata={"user_ids": user_ids, "max_rounds": max_rounds},
-    )
-
     return ConsensusState(
         user_ids=user_ids,
         max_rounds=max_rounds,
@@ -84,6 +76,7 @@ def create_initial_state(
         vote_result_list=vote_result_list or [],
         persona_prompts={},
         candidate_pool=[],
+        candidate_summaries={},
         round=0,
         messages=[],
         dialogue_history=[],
@@ -94,7 +87,6 @@ def create_initial_state(
         persona_votes=[],
         final_selection=[],
         final_decision="",
-        langfuse_trace_id=trace_id,
         is_error=False,
         error_message="",
     )
