@@ -177,7 +177,7 @@ class DiscussionRequestData(BaseSchema):
     dining_data: DiningData
     user_ids: list[int]
     filtered_restaurant: list[str]
-    vote_result_list: list[VoteResultData]
+    vote_result_list: Optional[list[VoteResultData]] = None
 
 
 class DiscussionRequestPayload(BaseSchema):

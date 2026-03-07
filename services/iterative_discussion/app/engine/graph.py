@@ -10,8 +10,12 @@ from services.iterative_discussion.app.nodes.moderator_preselect import (
 from services.iterative_discussion.app.nodes.multi_agent_dialogue import (
     multi_agent_dialogue,
 )
+from services.iterative_discussion.app.nodes.restaurant_summarizer import (
+    restaurant_summarizer,
+)
 from services.iterative_discussion.app.nodes.persona_factory import persona_factory
 from services.iterative_discussion.app.nodes.persona_voting import persona_voting
+from services.iterative_discussion.app.nodes.self_evolution import self_evolution
 
 
 def _check_error(state: ConsensusState) -> str:
@@ -52,7 +56,9 @@ def build_consensus_graph() -> StateGraph:
 
     # 노드 등록
     graph.add_node("persona_factory", persona_factory)
+    graph.add_node("self_evolution", self_evolution)
     graph.add_node("moderator_preselect", moderator_preselect)
+    graph.add_node("restaurant_summarizer", restaurant_summarizer)
     graph.add_node("multi_agent_dialogue", multi_agent_dialogue)
     graph.add_node("consensus_assessment", consensus_assessment)
     graph.add_node("persona_voting", persona_voting)
@@ -60,19 +66,25 @@ def build_consensus_graph() -> StateGraph:
     # 엔트리
     graph.set_entry_point("persona_factory")
 
-    # persona_factory → 에러 체크 → moderator_preselect
+    # persona_factory → 에러 체크 → self_evolution
     graph.add_conditional_edges(
         "persona_factory",
         _check_error,
-        {"continue": "moderator_preselect", "end": END},
+        {"continue": "self_evolution", "end": END},
     )
 
-    # moderator_preselect → 에러 체크 → multi_agent_dialogue
+    # self_evolution → moderator_preselect (항상 통과, 에러 없음)
+    graph.add_edge("self_evolution", "moderator_preselect")
+
+    # moderator_preselect → 에러 체크 → restaurant_summarizer
     graph.add_conditional_edges(
         "moderator_preselect",
         _check_error,
-        {"continue": "multi_agent_dialogue", "end": END},
+        {"continue": "restaurant_summarizer", "end": END},
     )
+
+    # restaurant_summarizer → multi_agent_dialogue (항상 통과, 에러 없음)
+    graph.add_edge("restaurant_summarizer", "multi_agent_dialogue")
 
     # multi_agent_dialogue → min_rounds 체크 → 스킵 or 합의 판정
     graph.add_conditional_edges(

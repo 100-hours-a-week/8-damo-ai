@@ -1,21 +1,40 @@
 import logging
+import time
+from importlib.metadata import version
 from typing import Any
 
 from faststream import FastStream, Context
+from langfuse import observe
 
 from shared.schemas.stream_schema import (
     DiscussionRequestPayload,
     DiscussionResponseData,
+    EventType,
     FinalRestaurant,
     RecommendationStreamingData,
+    RecommendationStreamingPayload,
     VoteResultData,
 )
 from shared.stream.service import KafkaService
 
+from shared.database.db_manager import DBManager
+
+from services.iterative_discussion.app.utils.logging_config import setup_logging
+
+setup_logging()  # 반드시 monitoring import 전에 호출
+logger = logging.getLogger(__name__)
+
+import services.iterative_discussion.app.utils.monitoring  # noqa: F401 — Langfuse 환경변수 주입
+
 from services.iterative_discussion.app.engine.graph import build_consensus_graph
 from services.iterative_discussion.app.engine.state import create_initial_state
 
-logger = logging.getLogger(__name__)
+logger.info(
+    "[Startup] langfuse==%s, langgraph==%s, langchain==%s",
+    version("langfuse"),
+    version("langgraph"),
+    version("langchain"),
+)
 
 service = KafkaService()
 broker = service.broker
@@ -30,14 +49,24 @@ def _safe_int(value: Any) -> int:
         return 0
 
 
+async def _save_persona_votes(dining_id: int, persona_votes: list[dict[str, Any]]) -> None:
+    """persona_votes를 dining_sessions.phases에 push하여 self_evolution에서 조회 가능하게 저장."""
+    try:
+        db = DBManager(col_name="dining_sessions")
+        await db.update_one_with_command(
+            {"diningId": dining_id},
+            {"$push": {"phases": {"persona_votes": persona_votes}}},
+            upsert=True,
+        )
+        logger.info("[SAVE] persona_votes 저장 완료: dining_id=%s", dining_id)
+    except Exception:
+        logger.warning("[SAVE] persona_votes 저장 실패: dining_id=%s", dining_id, exc_info=True)
+
+
 def _aggregate_persona_votes(
     persona_votes: list[dict[str, Any]],
 ) -> list[VoteResultData]:
-    """per-user votes를 per-restaurant VoteResultData로 집계 변환.
-
-    그래프 출력: [{user_id, votes: [{restaurant_id, approve, ...}]}]
-    스키마 기대: [{restaurant_id, like_count, dislike_count, liked_user_ids, disliked_user_ids}]
-    """
+    """per-user votes를 per-restaurant VoteResultData로 집계 변환."""
     restaurant_map: dict[str, dict[str, Any]] = {}
 
     for vote_entry in persona_votes:
@@ -72,6 +101,7 @@ def _aggregate_persona_votes(
 
 
 @broker.subscriber(service.get_ai_discussion_request_topic())
+@observe(name="llm_talks")
 async def handle_discussion_request(
     event: DiscussionRequestPayload,
     message=Context(),
@@ -83,42 +113,54 @@ async def handle_discussion_request(
     dining_id = req.dining_data.dining_id
 
     logger.info(
-        "Received discussion request: dining_id=%s, event_id=%s",
+        "[START] discussion request 수신: dining_id=%s, event_id=%s, users=%s",
         dining_id,
         event_id,
+        req.user_ids,
     )
 
     # 발언마다 recommendation-streaming 토픽에 publish 하는 콜백
     async def on_persona_speak(entry: dict) -> None:
-        data = RecommendationStreamingData(
+        streaming_data = RecommendationStreamingData(
             dining_id=dining_id,
             user_id=_safe_int(entry.get("user_id", 0)),
             content=entry.get("content", ""),
         )
-        await service.publish_recommendation_streaming(event_id=event_id, data=data)
+        payload = RecommendationStreamingPayload(
+            event_id=event_id,
+            event_type=EventType.RECOMMENDATION_STREAMING.value,
+            payload=streaming_data,
+        )
+        await service.publish_recommendation_streaming(data=payload)
 
     # 그래프 실행
     initial_state = create_initial_state(
         user_ids=req.user_ids,
         dining_data=req.dining_data.model_dump(),
         filtered_restaurant_ids=req.filtered_restaurant,
-        vote_result_list=[
-            v.model_dump(by_alias=False) for v in req.vote_result_list
-        ],
+        vote_result_list=[v.model_dump(by_alias=False) for v in req.vote_result_list],
     )
     graph = build_consensus_graph()
     config = {"configurable": {"on_persona_speak": on_persona_speak}}
 
+    logger.info("[GRAPH] 합의 그래프 실행 시작: dining_id=%s", dining_id)
+    t0 = time.monotonic()
     try:
         result = await graph.ainvoke(initial_state, config=config)
     except Exception:
-        logger.exception("Discussion graph failed: dining_id=%s", dining_id)
+        elapsed = time.monotonic() - t0
+        logger.exception(
+            "[GRAPH] 합의 그래프 실패: dining_id=%s (%.1fs 경과)", dining_id, elapsed
+        )
         error_data = DiscussionResponseData(
+            dining_id=dining_id,
             final_restaurant_ids=[],
             persona_vote_result_list=[],
         )
         await service.publish_ai_discussion_response(
-            event_id=event_id, key=key, data=error_data,
+            event_id=event_id,
+            key=key,
+            data=error_data,
         )
         return
 
@@ -131,13 +173,16 @@ async def handle_discussion_request(
                 break
             rid = str(r.get("_id", ""))
             if rid not in existing_ids:
-                final_selection.append({
-                    "restaurant_id": rid,
-                    "reason": f"{r.get('place_name', '')} — 후보 풀 기반 보충 선정",
-                })
+                final_selection.append(
+                    {
+                        "restaurant_id": rid,
+                        "reason": f"{r.get('place_name', '')} — 후보 풀 기반 보충 선정",
+                    }
+                )
                 existing_ids.add(rid)
 
     response_data = DiscussionResponseData(
+        dining_id=dining_id,
         final_restaurant_ids=[
             FinalRestaurant(
                 restaurant_id=item.get("restaurant_id", ""),
@@ -150,7 +195,17 @@ async def handle_discussion_request(
         ),
     )
     await service.publish_ai_discussion_response(
-        event_id=event_id, key=key, data=response_data,
+        event_id=event_id,
+        key=key,
+        data=response_data,
     )
 
-    logger.info("Discussion completed: dining_id=%s", dining_id)
+    await _save_persona_votes(dining_id, result.get("persona_votes", []))
+
+    elapsed = time.monotonic() - t0
+    logger.info(
+        "[DONE] 합의 완료: dining_id=%s, 최종 선정=%d개, 소요=%.1fs",
+        dining_id,
+        len(response_data.final_restaurant_ids),
+        elapsed,
+    )

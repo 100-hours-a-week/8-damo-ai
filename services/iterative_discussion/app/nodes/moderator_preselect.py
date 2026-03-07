@@ -2,6 +2,7 @@ import logging
 from typing import Any, Dict, List
 
 from bson import ObjectId
+from langfuse import observe
 
 from shared.database.db_manager import DBManager
 from services.iterative_discussion.app.engine.state import ConsensusState
@@ -11,12 +12,18 @@ from services.iterative_discussion.app.utils.scoring import rank_restaurants
 logger = logging.getLogger(__name__)
 
 
+@observe(name="moderator_preselect")
 async def moderator_preselect(state: ConsensusState) -> dict:
-    """Node 2: 식당 ID로 DB 조회 → 점수 기반 Top 10 선별."""
+    """Node 3: 식당 ID로 DB 조회 → 점수 기반 Top 10 선별."""
     restaurant_ids = state.get("filtered_restaurant_ids", [])
     user_data_list = state.get("user_data_list", [])
     rejected_ids = set(state.get("rejected_restaurant_ids", []))
     prev_pool = state.get("candidate_pool", [])
+    logger.info(
+        "[Node3] moderator_preselect 시작: 식당=%d개, 거부=%d개",
+        len(restaurant_ids),
+        len(rejected_ids),
+    )
 
     if not restaurant_ids:
         return {
@@ -83,6 +90,10 @@ async def moderator_preselect(state: ConsensusState) -> dict:
             swap_text = "\n".join(lines)
             moderator_feedback = f"{moderator_feedback}\n\n[후보 교체 안내]\n{swap_text}".strip()
 
+    logger.info(
+        "[Node3] moderator_preselect 완료: 후보=%d개 선별",
+        len(candidate_pool),
+    )
     return {
         "candidate_pool": candidate_pool,
         "rejected_restaurant_ids": [],

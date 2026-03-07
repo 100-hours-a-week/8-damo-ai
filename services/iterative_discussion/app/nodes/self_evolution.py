@@ -1,30 +1,33 @@
 import logging
-from typing import Any, Dict, List
+from dataclasses import dataclass, field
+from typing import Any, Dict, List, Tuple
 
-from langchain_core.messages import HumanMessage
+from langfuse import observe
 
 from shared.database.db_manager import DBManager
-from services.iterative_discussion.app.engine.llm_factory import get_chat_llm
 from services.iterative_discussion.app.engine.state import ConsensusState
 
 logger = logging.getLogger(__name__)
 
-EVOLUTION_PROMPT = """\
-당신은 식당 추천 시스템의 페르소나 분석가입니다.
+_FEEDBACK_FOOTER = "위 피드백을 참고하여, 이번 대화에서는 유저의 실제 취향에 더 가까운 의견을 내세요."
+_FEEDBACK_MARKER = "## 이전 추천 피드백\n"
 
-아래는 이전 추천에서 페르소나가 예측한 투표와 유저의 실제 반응입니다.
 
-## 페르소나 예측
-{persona_prediction}
+@dataclass(frozen=True)
+class VoteComparison:
+    """페르소나 예측 vs 실제 투표 비교 결과 한 건."""
 
-## 실제 유저 반응
-{actual_reaction}
+    restaurant_id: str
+    place_name: str
+    predicted_approve: bool
+    actual_approve: bool
+    reasoning: str
+    is_correct: bool = field(init=False)
 
-예측과 실제 반응이 불일치하는 부분을 분석하고,
-다음 추천에서 페르소나를 보정하기 위한 인사이트를 1~2문장으로 작성하세요.
-
-응답 형식: 인사이트 내용만 작성 (태그, JSON 없이 순수 텍스트)
-"""
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self, "is_correct", self.predicted_approve == self.actual_approve
+        )
 
 
 async def _fetch_previous_votes(dining_id: int) -> List[Dict[str, Any]]:
@@ -38,125 +41,178 @@ async def _fetch_previous_votes(dining_id: int) -> List[Dict[str, Any]]:
     if not phases:
         return []
 
-    # 가장 최근 phase의 persona_votes
     latest = phases[-1] if isinstance(phases, list) else {}
     return latest.get("persona_votes", [])
 
 
-def _find_mismatches(
-    previous_votes: List[Dict[str, Any]],
+def _build_actual_map(
     vote_result_list: List[Dict[str, Any]],
-) -> List[Dict[str, Any]]:
-    """페르소나 예측 vs 실제 반응 불일치를 찾는다.
-
-    Returns:
-        [{"user_id": ..., "restaurant_id": ..., "predicted": True, "actual": "dislike"}, ...]
-    """
-    # 실제 반응 매핑: restaurant_id → {liked_user_ids, disliked_user_ids}
+) -> Dict[str, Dict[str, List[int]]]:
+    """실제 투표 결과를 restaurant_id 기준 매핑으로 변환."""
     actual_map: Dict[str, Dict[str, List[int]]] = {}
     for vr in vote_result_list:
-        rid = vr.get("restaurant_id") or vr.get("restaurantId") or ""
+        rid = str(vr.get("restaurant_id") or vr.get("restaurantId") or "")
         actual_map[rid] = {
             "liked": vr.get("liked_user_ids") or vr.get("likedUserIds") or [],
             "disliked": vr.get("disliked_user_ids") or vr.get("dislikedUserIds") or [],
         }
+    return actual_map
 
-    mismatches = []
-    for vote_entry in previous_votes:
-        user_id = vote_entry.get("user_id", "")
+
+def _compare_votes(
+    user_id: str,
+    previous_votes: List[Dict[str, Any]],
+    actual_map: Dict[str, Dict[str, List[int]]],
+) -> Tuple[List[VoteComparison], List[VoteComparison]]:
+    """유저 한 명의 페르소나 예측 vs 실제 투표를 비교하여 맞춘/틀린 케이스 분류.
+
+    Returns:
+        (correct_list, incorrect_list) 튜플
+    """
+    try:
         uid_int = int(user_id) if user_id else 0
+    except (ValueError, TypeError):
+        return [], []
+    correct: List[VoteComparison] = []
+    incorrect: List[VoteComparison] = []
 
-        for vote in vote_entry.get("votes", []):
-            rid = vote.get("restaurant_id", "")
-            predicted_approve = vote.get("approve", True)
-            actual = actual_map.get(rid, {})
+    # previous_votes에서 해당 유저의 투표 엔트리 찾기
+    user_entry = None
+    for entry in previous_votes:
+        if str(entry.get("user_id", "")) == user_id:
+            user_entry = entry
+            break
 
-            # 실제 반응 판단
-            if uid_int in actual.get("liked", []):
-                actual_approve = True
-            elif uid_int in actual.get("disliked", []):
-                actual_approve = False
-            else:
-                continue  # 투표 안 한 식당은 스킵
+    if not user_entry:
+        return correct, incorrect
 
-            if predicted_approve != actual_approve:
-                mismatches.append({
-                    "user_id": user_id,
-                    "restaurant_id": rid,
-                    "predicted": predicted_approve,
-                    "actual": "like" if actual_approve else "dislike",
-                    "reasoning": vote.get("reasoning", ""),
-                })
+    for vote in user_entry.get("votes", []):
+        rid = str(vote.get("restaurant_id", ""))
+        actual = actual_map.get(rid)
+        if not actual:
+            continue
 
-    return mismatches
+        predicted_approve = vote.get("approve", True)
+
+        # 실제 반응 판단
+        if uid_int in actual.get("liked", []):
+            actual_approve = True
+        elif uid_int in actual.get("disliked", []):
+            actual_approve = False
+        else:
+            continue  # 투표 안 한 식당은 스킵
+
+        comparison = VoteComparison(
+            restaurant_id=rid,
+            place_name=vote.get("place_name", rid),
+            predicted_approve=predicted_approve,
+            actual_approve=actual_approve,
+            reasoning=vote.get("reasoning", ""),
+        )
+
+        if comparison.is_correct:
+            correct.append(comparison)
+        else:
+            incorrect.append(comparison)
+
+    return correct, incorrect
 
 
+def _format_vote_feedback(
+    correct: List[VoteComparison],
+    incorrect: List[VoteComparison],
+) -> str:
+    """맞춘/틀린 케이스를 few-shot 텍스트로 포맷."""
+    if not correct and not incorrect:
+        return ""
+
+    lines: List[str] = []
+
+    if correct:
+        lines.append("[맞춘 케이스]")
+        for c in correct:
+            pred = "찬성" if c.predicted_approve else "반대"
+            actual = "좋아요" if c.actual_approve else "싫어요"
+            lines.append(
+                f"- {c.place_name}: {pred} → 유저도 {actual} \u2713 (사유: {c.reasoning})"
+            )
+
+    if incorrect:
+        lines.append("[틀린 케이스]")
+        for c in incorrect:
+            pred = "찬성" if c.predicted_approve else "반대"
+            actual = "좋아요" if c.actual_approve else "싫어요"
+            lines.append(
+                f"- {c.place_name}: {pred} → 유저는 {actual} \u2717 (사유: {c.reasoning})"
+            )
+
+    lines.append("")
+    lines.append(_FEEDBACK_FOOTER)
+    return "\n".join(lines)
+
+
+@observe(name="self_evolution")
 async def self_evolution(state: ConsensusState) -> dict:
-    """재추천 시 페르소나 예측 vs 실제 반응을 비교하여 페르소나 프롬프트를 보정."""
+    """재추천 시 이전 가상투표 vs 실제 투표를 비교하여 few-shot 피드백을 프롬프트에 주입."""
+    logger.info("[Node2] self_evolution 시작")
     try:
         vote_result_list = state.get("vote_result_list", [])
+        if not vote_result_list:
+            logger.info("[Node2] 초기 추천 — self_evolution 스킵")
+            return {}  # 초기 추천이면 스킵
+
         dining_data = state.get("dining_data", {})
         persona_prompts = dict(state.get("persona_prompts", {}))
 
         dining_id = dining_data.get("diningId") or dining_data.get("dining_id")
         if not dining_id:
-            return {}  # dining_id 없으면 진화 스킵
+            return {}
 
-        # 이전 페르소나 투표 조회
+        # DB에서 이전 가상투표 조회
         previous_votes = await _fetch_previous_votes(dining_id)
         if not previous_votes:
-            return {}  # 이전 투표 없으면 진화 스킵
+            return {}
 
-        # 불일치 찾기
-        mismatches = _find_mismatches(previous_votes, vote_result_list)
-        if not mismatches:
-            return {}  # 전부 일치하면 보정 불필요
+        # 실제 투표 매핑 생성 (1회만)
+        actual_map = _build_actual_map(vote_result_list)
 
-        # 유저별 불일치 그룹핑
-        user_mismatches: Dict[str, List[Dict[str, Any]]] = {}
-        for m in mismatches:
-            uid = m["user_id"]
-            user_mismatches.setdefault(uid, []).append(m)
-
-        llm = get_chat_llm(temperature=0.3)
-        db = DBManager(col_name="users")
-
-        for user_id, user_misses in user_mismatches.items():
-            # LLM으로 인사이트 생성
-            prediction_text = "\n".join(
-                f"- {m['restaurant_id']}: {'찬성' if m['predicted'] else '반대'} (사유: {m['reasoning']})"
-                for m in user_misses
+        # 유저별로 맞춘/틀린 케이스 분류 → few-shot 텍스트 생성 → 프롬프트에 삽입
+        updated = False
+        for user_id in persona_prompts:
+            correct, incorrect = _compare_votes(
+                user_id, previous_votes, actual_map
             )
-            actual_text = "\n".join(
-                f"- {m['restaurant_id']}: 실제 반응 {m['actual']}"
-                for m in user_misses
-            )
+            feedback_text = _format_vote_feedback(correct, incorrect)
 
-            prompt = EVOLUTION_PROMPT.format(
-                persona_prediction=prediction_text,
-                actual_reaction=actual_text,
-            )
-
-            response = await llm.ainvoke([HumanMessage(content=prompt)])
-            insight = response.content.strip()
-
-            if not insight:
+            if not feedback_text:
                 continue
 
-            # 페르소나 프롬프트에 인사이트 삽입
-            if user_id in persona_prompts:
-                insight_line = f"\n[System Insight] {insight}"
-                persona_prompts[user_id] = insight_line + "\n" + persona_prompts[user_id]
+            prompt = persona_prompts[user_id]
+            if _FEEDBACK_MARKER not in prompt:
+                logger.warning(
+                    "self_evolution: feedback marker not found for user=%s",
+                    user_id,
+                )
+                continue
 
-            # DB의 otherCharacteristics에도 저장 (다음 세션에서 Node 1이 읽음)
-            uid_int = int(user_id) if user_id else 0
-            if uid_int:
-                user_doc = await db.read_one({"id": uid_int})
-                if user_doc:
-                    existing = user_doc.get("otherCharacteristics") or user_doc.get("other_characteristics") or ""
-                    updated = existing + f"\n[System Insight] {insight}"
-                    await db.update_one({"id": uid_int}, {"otherCharacteristics": updated})
+            persona_prompts[user_id] = prompt.replace(
+                _FEEDBACK_MARKER,
+                f"{_FEEDBACK_MARKER}{feedback_text}\n",
+                1,  # 첫 번째 매칭만 교체
+            )
+            updated = True
+            logger.info(
+                "self_evolution: user=%s correct=%d incorrect=%d",
+                user_id,
+                len(correct),
+                len(incorrect),
+            )
 
+        if not updated:
+            logger.info("[Node2] self_evolution: 업데이트할 피드백 없음, 스킵")
+            return {}
+
+        logger.info("[Node2] self_evolution 완료: 페르소나 프롬프트 업데이트됨")
         return {"persona_prompts": persona_prompts}
     except Exception:
         logger.warning("self_evolution 실패, 보정 스킵", exc_info=True)

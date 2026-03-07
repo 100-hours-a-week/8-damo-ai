@@ -21,6 +21,8 @@ def get_chat_llm(temperature: float = 0.7, local: bool = False) -> BaseChatModel
             "model": settings.LOCAL_MODEL,
             "temperature": temperature,
             "api_key": settings.LOCAL_API_KEY,
+            "streaming": True,
+            "stream_usage": True,
         }
         if settings.LOCAL_BASE_URL:
             kwargs["base_url"] = settings.LOCAL_BASE_URL
@@ -29,6 +31,8 @@ def get_chat_llm(temperature: float = 0.7, local: bool = False) -> BaseChatModel
             "model": settings.OPENAI_MODEL,
             "temperature": temperature,
             "api_key": settings.OPENAI_API_KEY,
+            "streaming": True,
+            "stream_usage": True,
         }
         if settings.OPENAI_BASE_URL:
             kwargs["base_url"] = settings.OPENAI_BASE_URL

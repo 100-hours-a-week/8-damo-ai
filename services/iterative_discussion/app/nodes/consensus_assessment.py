@@ -4,6 +4,8 @@ import re
 from typing import Any, Dict, List
 
 from langchain_core.messages import HumanMessage, SystemMessage
+from langfuse import get_client, observe
+from services.iterative_discussion.app.prompts.langfuse_prompts import make_callback_handler
 
 from services.iterative_discussion.app.engine.llm_factory import get_chat_llm
 from services.iterative_discussion.app.engine.state import ConsensusState
@@ -11,6 +13,8 @@ from services.iterative_discussion.app.prompts.consensus_templates import (
     CONSENSUS_ASSESSMENT_PROMPT,
     DEADLOCK_RESOLUTION_PROMPT,
 )
+from services.iterative_discussion.app.prompts.langfuse_prompts import get_prompt
+from shared.utils.config import settings
 
 
 logger = logging.getLogger(__name__)
@@ -118,12 +122,19 @@ def _build_moderator_feedback(
     return "\n".join(lines)
 
 
+@observe(name="consensus_assessment")
 async def consensus_assessment(state: ConsensusState) -> dict:
-    """Node 4: 합의 도달 여부 판정 + 교착 시 강제 선정."""
+    """Node 5: 합의 도달 여부 판정 + 교착 시 강제 선정."""
     candidate_pool = state.get("candidate_pool", [])
     dialogue_history = state.get("dialogue_history", [])
     current_round = state.get("round", 0)
     max_rounds = state.get("max_rounds", 3)
+    logger.info(
+        "[Node5] consensus_assessment 시작: round=%d/%d, 후보=%d개",
+        current_round,
+        max_rounds,
+        len(candidate_pool),
+    )
 
     candidate_text = _format_candidate_list(candidate_pool)
     dialogue_text = _format_dialogue_history(dialogue_history)
@@ -131,23 +142,31 @@ async def consensus_assessment(state: ConsensusState) -> dict:
     # 교착 상태 판단: max_rounds 도달 여부
     is_deadlock = current_round >= max_rounds
 
+    prompt_vars = {
+        "candidate_list": candidate_text,
+        "dialogue_history": dialogue_text,
+        "current_round": current_round,
+    }
     if is_deadlock:
-        prompt = DEADLOCK_RESOLUTION_PROMPT.format(
-            candidate_list=candidate_text,
-            dialogue_history=dialogue_text,
-            current_round=current_round,
+        prompt, lf_prompt = get_prompt(
+            "consensus-deadlock",
+            DEADLOCK_RESOLUTION_PROMPT,
+            **prompt_vars,
         )
     else:
-        prompt = CONSENSUS_ASSESSMENT_PROMPT.format(
-            candidate_list=candidate_text,
-            dialogue_history=dialogue_text,
-            current_round=current_round,
+        prompt, lf_prompt = get_prompt(
+            "consensus-assessment",
+            CONSENSUS_ASSESSMENT_PROMPT,
+            **prompt_vars,
         )
 
     llm = get_chat_llm(temperature=0.0)
+    get_client().update_current_span(metadata={"tags": ["consensus_assessment", settings.OPENAI_MODEL]})
 
     try:
-        response = await llm.ainvoke([HumanMessage(content=prompt)])
+        lf_handler = make_callback_handler()
+        lf_config = {"callbacks": [lf_handler], "metadata": {"round": current_round, "is_deadlock": is_deadlock}}
+        response = await llm.ainvoke([HumanMessage(content=prompt)], config=lf_config)
     except Exception:
         logger.warning("합의 판정 LLM 호출 실패", exc_info=True)
         parsed = {}
@@ -219,6 +238,12 @@ async def consensus_assessment(state: ConsensusState) -> dict:
             candidates, rejected, candidate_pool,
         )
 
+    logger.info(
+        "[Node5] consensus_assessment 완료: reached=%s, candidates=%d, rejected=%d",
+        consensus_reached,
+        len(candidates),
+        len(rejected_ids),
+    )
     return {
         "consensus_reached": consensus_reached,
         "consensus_candidates": candidates,
