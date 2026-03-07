@@ -17,6 +17,8 @@ from shared.schemas.stream_schema import (
 )
 from shared.stream.service import KafkaService
 
+from shared.database.db_manager import DBManager
+
 from services.iterative_discussion.app.utils.logging_config import setup_logging
 
 setup_logging()  # 반드시 monitoring import 전에 호출
@@ -45,6 +47,20 @@ def _safe_int(value: Any) -> int:
         return int(value)
     except (ValueError, TypeError):
         return 0
+
+
+async def _save_persona_votes(dining_id: int, persona_votes: list[dict[str, Any]]) -> None:
+    """persona_votes를 dining_sessions.phases에 push하여 self_evolution에서 조회 가능하게 저장."""
+    try:
+        db = DBManager(col_name="dining_sessions")
+        await db.update_one_with_command(
+            {"diningId": dining_id},
+            {"$push": {"phases": {"persona_votes": persona_votes}}},
+            upsert=True,
+        )
+        logger.info("[SAVE] persona_votes 저장 완료: dining_id=%s", dining_id)
+    except Exception:
+        logger.warning("[SAVE] persona_votes 저장 실패: dining_id=%s", dining_id, exc_info=True)
 
 
 def _aggregate_persona_votes(
@@ -183,6 +199,8 @@ async def handle_discussion_request(
         key=key,
         data=response_data,
     )
+
+    await _save_persona_votes(dining_id, result.get("persona_votes", []))
 
     elapsed = time.monotonic() - t0
     logger.info(

@@ -20,9 +20,7 @@ def _build_prompt_vars(restaurant: Dict[str, Any]) -> Dict[str, str]:
     """식당 문서에서 프롬프트 변수 추출."""
     menus = restaurant.get("menus", [])
     menu_text = (
-        ", ".join(
-            f"{m.get('title', '')}({m.get('price', 0)}원)" for m in menus
-        )
+        ", ".join(m.get("title", "") for m in menus if m.get("title"))
         if menus
         else "메뉴 정보 없음"
     )
@@ -31,13 +29,13 @@ def _build_prompt_vars(restaurant: Dict[str, Any]) -> Dict[str, str]:
     amenity_text = ", ".join(amenities) if amenities else "없음"
 
     keywords = restaurant.get("restaurant_review_keywords", [])
-    keyword_text = (
-        ", ".join(
-            f"{k.get('keyword', '')}({k.get('count', 0)})" for k in keywords
-        )
-        if keywords
-        else "없음"
-    )
+    if keywords:
+        sorted_keywords = sorted(keywords, key=lambda k: k.get("count", 0), reverse=True)
+        filtered = [k for k in sorted_keywords if k.get("count", 0) >= 50]
+        selected = filtered if filtered else sorted_keywords[:3]
+        keyword_text = ", ".join(k.get("keyword", "") for k in selected[:3] if k.get("keyword"))
+    else:
+        keyword_text = "없음"
 
     return {
         "place_name": restaurant.get("place_name", "알 수 없음"),

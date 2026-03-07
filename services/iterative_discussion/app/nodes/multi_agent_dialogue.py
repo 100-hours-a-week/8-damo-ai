@@ -1,5 +1,6 @@
 import inspect
 import logging
+import re
 from typing import Any, Awaitable, Callable, Dict, List, Optional, Union
 
 from langchain_core.messages import AIMessage, SystemMessage
@@ -228,7 +229,7 @@ async def multi_agent_dialogue(state: ConsensusState, config: RunnableConfig) ->
             user_id,
             len(response.content),
         )
-        return response.content
+        return re.sub(r"^\[.+?\]:\s*", "", response.content).strip()
 
     for rotation in range(rotations):
         for user_id, system_prompt in persona_prompts.items():
