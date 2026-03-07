@@ -1,6 +1,5 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-
 class Settings(BaseSettings):
     GOOGLE_API_KEY: str
     GEMINI_MODEL: str = "gemini-3-flash-preview"
@@ -23,7 +22,10 @@ class Settings(BaseSettings):
     LANGSMITH_API_KEY: str
     OPENROUTER_API_KEY: str
     OPENROUTER_MODEL: str
-
+    RUNPOD_API_KEY: str
+    RUNPOD_API_URL: str
+    GOOGLE_CREDENTIALS_JSON: str
+    
     KAFKA_BOOTSTRAP_SERVERS: str
     KAFKA_GROUP_ID: str = "damo-ai-dev"
     KAFKA_CLIENT_ID: str = "damo-ai-dev-gateway-client"

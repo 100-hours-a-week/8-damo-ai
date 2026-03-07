@@ -10,6 +10,7 @@ from shared.schemas.stream_schema import (
     RecommendationResponsePayload,
     RecommendationStreamingPayload,
     DiscussionRequestPayload,
+    DiscussionRequestData,
     DiscussionResponseData,
     DiscussionResponsePayload,
     RecommendationStreamingData,
@@ -92,11 +93,32 @@ class KafkaService:
         self, data: RecommendationStreamingPayload
     ):
         await self._recommendation_streaming_publisher.publish(
-            message=data,
-            key=f"{data.payload.dining_id}-{data.payload.user_id}".encode("utf-8"),
+            message=payload, key=f"{data.dining_id}-{data.user_id}".encode("utf-8")
         )
         print(
-            f"Service: Published recommendation streaming for key {data.payload.dining_id}-{data.payload.user_id}"
+            f"Service: Published recommendation streaming for key {data.dining_id}-{data.user_id}"
+        )
+    
+    async def publish_ai_discussion_request(
+        self, 
+        event_id: int,
+        key: bytes,
+        headers: dict,
+        data: DiscussionRequestData
+    ):
+        incoming_headers = headers if headers else {}
+        display_key = key.decode('utf-8', errors='ignore') if key else 'None'
+        
+        payload = DiscussionRequestPayload(
+            event_id=event_id,
+            event_type=EventType.DISCUSSION_REQUEST.value,
+            payload=data,
+        )
+
+        await self._discussion_request_publisher.publish(
+            headers=incoming_headers, 
+            message=payload, 
+            key=key
         )
 
     # 이벤트 타입 수정 필요
@@ -134,7 +156,6 @@ class KafkaService:
                     event_type = EventType.RECOMMENDATION_RESPONSE.value
                 case TopicType.USER_PERSONA_UPDATE.value:
                     event_type = EventType.USER_PERSONA_UPDATE.value
-
             print(exc)
             print(f"error-topic : {error_topic}")
             print(f"publish-event-type : {event_type}")

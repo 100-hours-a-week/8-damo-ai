@@ -1,4 +1,5 @@
 import os
+import logging
 from datetime import datetime
 from motor.motor_asyncio import AsyncIOMotorClient
 from pymongo import UpdateOne, errors, GEOSPHERE, ReturnDocument
@@ -6,6 +7,8 @@ from typing import List, Dict, Any, Optional, Union
 from shared.utils.config import settings
 from shared.schemas.recommendations_request import RecommendationsRequest
 from shared.state.recommendation_state import RecommendationState
+
+logger = logging.getLogger("faststream")
 
 
 class DBManager:
@@ -29,7 +32,7 @@ class DBManager:
             result = await self.collection.insert_one(data)
             return result.inserted_id
         except errors.PyMongoError as e:
-            print(f"삽입 에러: {e}")
+            logger.error(f"MongoDB Insert Error: {e}")
             return None
 
     async def read_all(
@@ -64,7 +67,7 @@ class DBManager:
             )
             return result
         except errors.PyMongoError as e:
-            print(f"단계 업데이트 에러: {e}")
+            logger.error(f"MongoDB Increment Error: {e}")
             return None
 
     async def update_one(
@@ -127,13 +130,14 @@ class DBManager:
 
             user_ids = result.get("user_ids")
             dining_data = result.get("dining_data")
-            restaurant_candidates = result.get("filtered_restaurants")
-            rejected_candidates = result.get("rejected_restaurants")
-            phases = result.get("vote_result_list")
-            status_message = result.get("status_message")
+            restaurant_candidates = result.get("filtered_restaurant") or []
+            rejected_candidates = result.get("rejected_restaurant") or []
+            raw_phases = result.get("vote_result_list") or []
+            phases = [p.model_dump() if hasattr(p, "model_dump") else p for p in raw_phases]
+            status_message = result.get("status_message") or []
 
             if dining_data is None:
-                print("세션 저장 실패: dining_data가 없습니다.")
+                logger.error("Session Save Failed: dining_data is missing.")
                 return False
 
             # 1. dining_info 추출 (Pydantic 모델 또는 dict 대응)
@@ -151,7 +155,7 @@ class DBManager:
             if dining_id is None:
                 dining_id = dining_info.get("diningId") or dining_info.get("dining_id")
             if dining_id is None:
-                print("세션 저장 실패: diningId를 찾을 수 없습니다.")
+                logger.error("Session Save Failed: diningId not found.")
                 return False
 
             # 문서 검색 (diningId 기준)
@@ -167,7 +171,7 @@ class DBManager:
                         "phases": phases,
                         "updatedAt": now,
                     },
-                    "$push": {"statusMessage": {"$each": status_message}},
+                    "$set": {"statusMessage": status_message}
                 }
 
                 # 거절된 식당이 있으면 push ($each 사용으로 리스트 병합)
@@ -177,7 +181,8 @@ class DBManager:
                     }
 
                 await self.collection.update_one({"diningId": dining_id}, update_query)
-                await self.update_phase_count({"diningId": dining_id}, "currentPhase")
+                updated_doc = await self.update_phase_count({"diningId": dining_id}, "currentPhase")
+                return updated_doc
             else:
                 # 없을 경우 (CREATE)
                 session_data = {
@@ -201,8 +206,8 @@ class DBManager:
                     "updatedAt": now,
                 }
                 await self.create_one(session_data)
-
-            return True
+                return session_data
+                
         except Exception as e:
-            print(f"세션 저장 중 오류 발생: {str(e)}")
+            logger.error(f"Error during session save: {str(e)}")
             return False
