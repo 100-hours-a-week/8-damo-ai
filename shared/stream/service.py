@@ -63,6 +63,9 @@ class KafkaService:
         self._recommendation_streaming_publisher = self.broker.publisher(
             TopicType.RECOMMENDATION_STREAMING.value
         )
+        self._discussion_request_publisher = self.broker.publisher(
+            TopicType.DISCUSSION_REQUEST.value
+        )
         self._discussion_response_publisher = self.broker.publisher(
             TopicType.DISCUSSION_RESPONSE.value
         )
