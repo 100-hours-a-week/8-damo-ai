@@ -249,19 +249,6 @@ async def handle_receipt_ocr(event: ReceiptOCRRequestPayload, logger: Logger, me
         logger.error(f"Critical error in receipt ocr handler: {e}")
         raise e
 # ------------------------------------------------
-# 7. 번개 요청
-# @broker.subscriber(, group_id=settings.KAFKA_GROUP_ID)
-# async def handle_lightning_request(event:, logger: Logger, message = Context()):
-#     logger.info("get lightning ocr request")
-#     try:
-#         payload = event.payload
-#         # mockup
-#         # 도치피자(6976b54010e1fa815903d4ce)
-#         # await service.publish_receipt_ocr_response(payload, message)
-#     except Exception as e:
-#         logger.error(f"Critical error in receipt ocr handler: {e}")
-#         raise e
-# ----------------
 
 
 @app.after_shutdown

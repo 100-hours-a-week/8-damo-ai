@@ -118,6 +118,9 @@ class KafkaService:
         await self._discussion_request_publisher.publish(
             headers=incoming_headers, message=payload, key=key
         )
+        print(
+            f"Service: Published discussion request for key {display_key} - Event ID: {event_id}"
+        )
 
     # 이벤트 타입 수정 필요
     async def publish_receipt_ocr_response(self, event, message: KafkaMessage):
