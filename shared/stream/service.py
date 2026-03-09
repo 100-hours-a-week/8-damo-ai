@@ -173,5 +173,8 @@ class KafkaService:
     def get_receipt_ocr_request_topic(self):
         return TopicType.RECEIPT_OCR_REQUEST.value
 
+    def get_ai_discussion_response_topic(self):
+        return TopicType.DISCUSSION_RESPONSE.value
+
     def get_ai_discussion_request_topic(self):
         return TopicType.DISCUSSION_REQUEST.value
