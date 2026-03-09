@@ -1,0 +1,41 @@
+FROM vllm/vllm-openai:latest
+
+WORKDIR /app
+
+# Java + Kafka (KRaft mode, Zookeeper 불필요) 설치
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    openjdk-17-jre-headless curl && \
+    rm -rf /var/lib/apt/lists/*
+
+ENV KAFKA_VERSION=3.7.0
+ENV KAFKA_HOME=/opt/kafka
+
+RUN curl -fsSL https://archive.apache.org/dist/kafka/${KAFKA_VERSION}/kafka_2.13-${KAFKA_VERSION}.tgz \
+    | tar -xz -C /opt && \
+    mv /opt/kafka_2.13-${KAFKA_VERSION} ${KAFKA_HOME}
+
+# KRaft 설정
+RUN ${KAFKA_HOME}/bin/kafka-storage.sh format \
+    --config ${KAFKA_HOME}/config/kraft/server.properties \
+    --cluster-id $(${KAFKA_HOME}/bin/kafka-storage.sh random-uuid) \
+    --ignore-formatted
+
+# Python 의존성 설치
+COPY requirements.txt ./requirements.txt
+COPY services/agent_dialogue/requirements.txt ./services/agent_dialogue/requirements.txt
+RUN pip install --no-cache-dir \
+    -r requirements.txt \
+    -r services/agent_dialogue/requirements.txt
+
+COPY . .
+
+RUN chmod +x services/agent_dialogue/start-runpod.sh
+
+ENV PYTHONPATH=/app
+ENV LOCAL_MODEL=skt/A.X-4.0-Light
+ENV LOCAL_BASE_URL=http://localhost:8000/v1
+ENV LOCAL_API_KEY=local
+ENV KAFKA_BOOTSTRAP_SERVERS=localhost:9092
+ENV HF_HOME=/workspace
+
+CMD ["bash", "services/agent_dialogue/start-runpod.sh"]
