@@ -13,6 +13,7 @@ from shared.schemas.stream_schema import (
     DiscussionRequestData,
     DiscussionResponseData,
     DiscussionResponsePayload,
+    RecommendationStreamingData,
     EventType,
     TopicType,
 )
