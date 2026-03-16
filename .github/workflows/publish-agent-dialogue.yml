@@ -39,6 +39,8 @@ jobs:
           file: ${{ github.workspace }}/services/agent_dialogue/Dockerfile.runpod
           push: true
           platforms: linux/amd64
-          tags: ghcr.io/kt20201224/agent-dialogue:latest
+          tags: |
+            ghcr.io/kt20201224/agent-dialogue:latest
+            ghcr.io/kt20201224/agent-dialogue:v1.0.${{ github.run_number }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
