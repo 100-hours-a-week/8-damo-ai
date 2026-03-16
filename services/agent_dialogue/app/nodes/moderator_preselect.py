@@ -67,9 +67,11 @@ async def moderator_preselect(state: AgentDialogueState) -> dict:
             r["_id"] = str(r["_id"])
 
     # score 기반 정렬 (배치 크기 내에서)
+    dining_data = state.get("dining_data", {})
     candidate_pool = rank_restaurants(
         restaurants=restaurants,
         user_data_list=user_data_list,
+        dining_data=dining_data,
         top_k=_BATCH_SIZE,
     )
 

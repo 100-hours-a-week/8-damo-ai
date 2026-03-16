@@ -1,9 +1,11 @@
 from langgraph.graph import END, StateGraph
+from langgraph.graph.state import CompiledStateGraph
 
 from services.agent_dialogue.app.engine.state import AgentDialogueState
 from services.agent_dialogue.app.nodes.moderator_preselect import moderator_preselect
 from services.agent_dialogue.app.nodes.persona_factory import persona_factory
 from services.agent_dialogue.app.nodes.restaurant_dialogue import restaurant_dialogue
+from services.agent_dialogue.app.nodes.score_fallback import score_fallback
 
 
 def _check_error(state: AgentDialogueState) -> str:
@@ -17,7 +19,8 @@ def _after_restaurant_dialogue(state: AgentDialogueState) -> str:
     - 추천 5개 채움 → END
     - 현재 배치에 남은 식당 → 다음 식당 처리
     - 배치 완료 + 추가 ID 있음 → 다음 배치 fetch
-    - 모두 소진 → END (fallback은 main.py에서 처리)
+    - 모두 소진 + 추천 부족 → score_fallback
+    - 모두 소진 + 추천 충분 → END
     """
     if state.get("is_error"):
         return "end"
@@ -33,10 +36,10 @@ def _after_restaurant_dialogue(state: AgentDialogueState) -> str:
     if offset < total:
         return "preselect"
 
-    return "end"
+    return "fallback"
 
 
-def build_agent_dialogue_graph() -> StateGraph:
+def build_agent_dialogue_graph() -> CompiledStateGraph:
     """3노드 그래프를 빌드하고 컴파일된 그래프를 반환."""
     graph = StateGraph(AgentDialogueState)
 
@@ -44,6 +47,7 @@ def build_agent_dialogue_graph() -> StateGraph:
     graph.add_node("persona_factory", persona_factory)
     graph.add_node("moderator_preselect", moderator_preselect)
     graph.add_node("restaurant_dialogue", restaurant_dialogue)
+    graph.add_node("score_fallback", score_fallback)
 
     # 엔트리
     graph.set_entry_point("persona_factory")
@@ -69,8 +73,12 @@ def build_agent_dialogue_graph() -> StateGraph:
         {
             "restaurant": "restaurant_dialogue",  # 현재 배치 다음 식당
             "preselect": "moderator_preselect",   # 다음 배치 fetch
+            "fallback": "score_fallback",         # 모두 소진, 추천 부족 → score 보충
             "end": END,
         },
     )
+
+    # score_fallback → END
+    graph.add_edge("score_fallback", END)
 
     return graph.compile()
