@@ -32,11 +32,14 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      - name: Copy Dockerfile to context root
+        run: cp services/agent_dialogue/Dockerfile.runpod ./Dockerfile.runpod
+
       - name: Build and push
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ${{ github.workspace }}/services/agent_dialogue/Dockerfile.runpod
+          file: ./Dockerfile.runpod
           push: true
           platforms: linux/amd64
           tags: |
