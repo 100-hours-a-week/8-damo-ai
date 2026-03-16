@@ -49,7 +49,7 @@ jobs:
           push: true
           platforms: linux/amd64
           tags: |
-            ghcr.io/kt20201224/agent-dialogue:latest
-            ghcr.io/kt20201224/agent-dialogue:v1.0.${{ github.run_number }}
+            ghcr.io/100-hours-a-week/agent-dialogue:latest
+            ghcr.io/100-hours-a-week/agent-dialogue:v1.0.${{ github.run_number }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
