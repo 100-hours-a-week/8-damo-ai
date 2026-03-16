@@ -2,6 +2,13 @@ name: Publish agent-dialogue image
 
 on:
   workflow_dispatch:
+  push:
+    branches: [dev]
+    paths:
+      - 'services/agent_dialogue/**'
+      - 'shared/**'
+      - 'requirements.txt'
+      - 'Dockerfile'
 
 permissions:
   contents: read
