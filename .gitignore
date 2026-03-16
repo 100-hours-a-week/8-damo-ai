@@ -86,10 +86,6 @@ test_6.json
 test_7.json
 test_8.json
 test_9.json
-services/agent_dialogue/app/nodes/persona_factory.py
-services/agent_dialogue/app/nodes/restaurant_dialogue.py
-services/agent_dialogue/app/prompts/langfuse_prompts.py
-services/agent_dialogue/app/prompts/persona_templates.py
 services/agent_dialogue/start-runpod.sh
 services/agent_dialogue/streamlit_app.py
 services/agent_dialogue/Dockerfile.litellm
