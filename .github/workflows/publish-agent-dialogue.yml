@@ -36,7 +36,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: services/agent_dialogue/Dockerfile.runpod
+          file: ${{ github.workspace }}/services/agent_dialogue/Dockerfile.runpod
           push: true
           platforms: linux/amd64
           tags: ghcr.io/kt20201224/agent-dialogue:latest
