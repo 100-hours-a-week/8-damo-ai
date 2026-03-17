@@ -79,7 +79,7 @@ async def distance_node(state: RecommendationState) -> RecommendationState:
     return Command(update={
         "filtered_restaurant": restaurants,
         "status_message": f"거리 필터링 완료: {len(restaurants)}개 검색됨 (가까운 순 정렬)"
-    }, goto="allergy")
+    }, goto="budget")
 
 def _scoring_allergy(user_datas: list[dict], filtered_restaurant: list[dict]) -> list[dict]:
     def _calculate_dynamic_score(menus: list[dict], allergy: str) -> float:
@@ -168,7 +168,7 @@ async def allergy_node(state: RecommendationState) -> RecommendationState:
 # 예산 노드
 async def budget_node(state: RecommendationState) -> dict:
     start_time = time()
-    total_budget = getattr(state["dining_data"], "budget", 0) 
+    total_budget = state["dining_data"].get("budget", 0)
     member_count = len(state["user_ids"])
     
     if total_budget <= 0 or member_count <= 0:
