@@ -41,3 +41,11 @@ jobs:
             ${{ secrets.DOCKERHUB_USERNAME }}/agent-dialogue:${{ env.IMAGE_TAG }}
           cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/agent-dialogue:cache
           cache-to: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/agent-dialogue:cache,mode=max
+
+      - name: Update RunPod endpoint image
+        run: |
+          curl -s -X POST "https://api.runpod.io/graphql?api_key=${{ secrets.RUNPOD_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "query": "mutation { saveEndpoint(input: { id: \"${{ secrets.RUNPOD_ENDPOINT_ID }}\", imageName: \"${{ secrets.DOCKERHUB_USERNAME }}/agent-dialogue:${{ env.IMAGE_TAG }}\" }) { id imageName } }"
+            }'
