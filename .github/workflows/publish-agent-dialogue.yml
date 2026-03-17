@@ -1,6 +1,12 @@
 name: Publish agent-dialogue image
 
 on:
+  push:
+    branches: [ feature/v3/agent_dialogue ]
+    paths:
+      - 'services/agent_dialogue/**'
+      - 'shared/**'
+      - 'requirements.txt'
   workflow_dispatch:
 
 jobs:
