@@ -1,7 +1,6 @@
 #!/bin/bash
 set -e
 export PYTHONUNBUFFERED=1
-export HF_HOME=/workspace
 
 echo "Starting vLLM server: ${LOCAL_MODEL:-HugJerry99/SKT-AX-4.0-Light-AWQ}"
 python3 -m vllm.entrypoints.openai.api_server \
@@ -16,5 +15,10 @@ echo "Waiting for vLLM..."
 until curl -s http://localhost:8000/health > /dev/null 2>&1; do sleep 2; done
 echo "vLLM ready!"
 
-# RunPod Serverless 핸들러 실행
-python3 -m services.agent_dialogue.handler
+faststream run services.agent_dialogue.app.main:app &
+FASTSTREAM_PID=$!
+
+wait -n $VLLM_PID $FASTSTREAM_PID
+echo "One process exited, shutting down..."
+kill $VLLM_PID $FASTSTREAM_PID 2>/dev/null
+wait

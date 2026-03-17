@@ -2,13 +2,6 @@ name: Publish agent-dialogue image
 
 on:
   workflow_dispatch:
-  push:
-    branches: [dev]
-    paths:
-      - 'services/agent_dialogue/**'
-      - 'shared/**'
-      - 'requirements.txt'
-      - 'Dockerfile'
 
 permissions:
   contents: read
@@ -19,12 +12,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Free disk space
-        run: |
-          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache
-          sudo docker image prune -af
-          df -h
-
       - name: Checkout
         uses: actions/checkout@v4
 
@@ -38,18 +25,13 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Copy Dockerfile to context root
-        run: cp services/agent_dialogue/Dockerfile.runpod ./Dockerfile.runpod
-
       - name: Build and push
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./Dockerfile.runpod
+          file: services/agent_dialogue/Dockerfile.runpod
           push: true
           platforms: linux/amd64
-          tags: |
-            ghcr.io/100-hours-a-week/agent-dialogue:latest
-            ghcr.io/100-hours-a-week/agent-dialogue:v1.0.${{ github.run_number }}
+          tags: ghcr.io/kt20201224/agent-dialogue:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max

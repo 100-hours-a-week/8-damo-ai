@@ -14,7 +14,7 @@ RUN pip install --no-cache-dir \
 
 COPY . .
 
-RUN chmod +x services/agent_dialogue/start-serverless.sh
+RUN chmod +x services/agent_dialogue/start-kafka.sh
 
 ENV PYTHONPATH=/app
 ENV LOCAL_MODEL=HugJerry99/SKT-AX-4.0-Light-AWQ
@@ -23,5 +23,4 @@ ENV LOCAL_API_KEY=local
 ENV KAFKA_BOOTSTRAP_SERVERS=
 ENV HF_HOME=/workspace
 
-ENTRYPOINT []
-CMD ["bash", "services/agent_dialogue/start-serverless.sh"]
+CMD ["bash", "services/agent_dialogue/start-kafka.sh"]
