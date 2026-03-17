@@ -26,6 +26,9 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      - name: Resolve image tag
+        run: echo "IMAGE_TAG=${GITHUB_SHA::7}" >> "$GITHUB_ENV"
+
       - name: Build and push
         uses: docker/build-push-action@v5
         with:
@@ -35,5 +38,6 @@ jobs:
           platforms: linux/amd64
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/agent-dialogue:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+            ${{ secrets.DOCKERHUB_USERNAME }}/agent-dialogue:${{ env.IMAGE_TAG }}
+          cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/agent-dialogue:cache
+          cache-to: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/agent-dialogue:cache,mode=max
