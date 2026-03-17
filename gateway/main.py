@@ -5,7 +5,7 @@ from shared.stream.service import KafkaService
 from shared.database.db_manager import DBManager
 # Kafka 페이로드
 from shared.schemas.stream_schema import (
-    RecommendationRequestPayload, 
+    RecommendationRequestPayload,
     RecommendationRefreshRequestPayload,
     RecommendationResponseData,
     RecommendedItem,
@@ -13,7 +13,8 @@ from shared.schemas.stream_schema import (
     UserPersonaUpdatePayload,
     DiscussionResponsePayload,
     ReceiptOCRRequestPayload,
-    DiscussionRequestData
+    DiscussionRequestData,
+    EventType,
 )
 # 기존 Graph 관련 State
 from shared.schemas.user_data import UserData
@@ -77,13 +78,12 @@ async def handle_recommendation(event: RecommendationRequestPayload, logger: Log
             filtered_restaurant=restaurant_ids,
             vote_result_list=[]
         )
-        # 3. 토픽 발행
-        await service.publish_ai_discussion_request(
-            event_id=event.event_id,
-            key=message.raw_message.key,
-            headers=dict(message.headers),
-            data=discussion_data
-        )
+        # 3. RunPod 비동기 작업 요청
+        await runpod.run_async_task({
+            "event_id": event.event_id,
+            "event_type": EventType.DISCUSSION_REQUEST.value,
+            "payload": discussion_data.model_dump(),
+        })
     except Exception as e:
         logger.error(f"Error in handle_recommendation: {e}")
         raise e
@@ -121,13 +121,12 @@ async def handle_recommendation_refresh(event: RecommendationRefreshRequestPaylo
                 filtered_restaurant=restaurant_ids,
                 vote_result_list=[]
             )
-            # 3. 토픽 발행
-            await service.publish_ai_discussion_request(
-                event_id=event.event_id,
-                key=message.raw_message.key,
-                headers=dict(message.headers),
-                data=discussion_data
-            )
+            # 3. RunPod 비동기 작업 요청
+            await runpod.run_async_task({
+                "event_id": event.event_id,
+                "event_type": EventType.DISCUSSION_REQUEST.value,
+                "payload": discussion_data.model_dump(),
+            })
         else:
             raw_res = final_state.get("filtered_restaurant", [])
             items = [
