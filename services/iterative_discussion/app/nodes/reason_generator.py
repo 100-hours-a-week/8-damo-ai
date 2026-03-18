@@ -24,39 +24,46 @@ async def _generate_reason(
     llm: Any,
     restaurants_collection: Any,
 ) -> tuple[str, str]:
-    """LLM으로 추천이유를 생성. 실패 시 discussion_reason으로 fallback."""
+    """LLM으로 추천이유를 생성. 식당 정보 조회 실패 시에도 LLM 호출, 최종 실패 시 generic fallback."""
+    GENERIC_FALLBACK = "예산과 위치를 고려한 최적의 회식 장소입니다."
+
+    from bson import ObjectId
+    from bson.errors import InvalidId
+
+    # MongoDB 조회 시도 — 실패해도 LLM 호출은 계속
+    restaurant = None
     try:
-        from bson import ObjectId
-        from bson.errors import InvalidId
-
-        try:
-            oid = ObjectId(restaurant_id)
-        except InvalidId:
-            return restaurant_id, discussion_reason
-
+        oid = ObjectId(restaurant_id)
         restaurant = await restaurants_collection.find_one({"_id": oid})
-        if not restaurant:
-            return restaurant_id, discussion_reason
+    except (InvalidId, Exception):
+        pass
 
+    if restaurant:
         menus = restaurant.get("menus", [])
         top_menus = ", ".join(
             m.get("title") or m.get("name", "")
             for m in menus[:3]
             if m.get("title") or m.get("name")
         )
+        actual_place_name = restaurant.get("place_name") or restaurant.get("name") or place_name
+        category_detail = restaurant.get("category_detail", "")
+    else:
+        top_menus = "정보 없음"
+        actual_place_name = place_name
+        category_detail = ""
 
-        budget = dining_data.get("budget", "")
-        dining_date = dining_data.get("dining_date", "")
-        # dining_data에 user_ids가 없으므로 member_count는 별도로 전달받지 않음
-        member_count = dining_data.get("member_count", "")
+    budget = dining_data.get("budget", "")
+    dining_date = dining_data.get("dining_date", "")
+    member_count = dining_data.get("member_count", "")
 
+    try:
         user_prompt = REASON_GENERATOR_USER_PROMPT.format(
             budget=budget,
             member_count=member_count,
             dining_date=dining_date,
-            place_name=restaurant.get("place_name") or restaurant.get("name") or place_name,
-            category_detail=restaurant.get("category_detail", ""),
-            top_menus=top_menus or "정보 없음",
+            place_name=actual_place_name,
+            category_detail=category_detail,
+            top_menus=top_menus,
             discussion_reason=discussion_reason or "토론에서 선정됨",
         )
 
@@ -66,11 +73,11 @@ async def _generate_reason(
         ]
         response = await llm.ainvoke(messages)
         reason = response.content.strip()
-        return restaurant_id, reason if reason else discussion_reason
+        return restaurant_id, reason if reason else GENERIC_FALLBACK
 
     except Exception as e:
-        logger.warning(f"_generate_reason failed for {restaurant_id}: {e}")
-        return restaurant_id, discussion_reason
+        logger.warning(f"_generate_reason LLM 호출 실패 for {restaurant_id}: {e}")
+        return restaurant_id, GENERIC_FALLBACK
 
 
 def _supplement_to_five(
