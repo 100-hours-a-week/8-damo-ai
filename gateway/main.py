@@ -31,6 +31,7 @@ from services.recommendation.task import recommendation_task
 from services.recommendation.sub_graphs.fix import fix_task
 
 from services.core_service.modules.ocr.service import GoogleVisionService
+from services.recommendation.rag_reason import rag_reason_task
 
 # ------------------------------------------------
 # ------------------------------------------------
@@ -170,6 +171,21 @@ async def handle_discussion_response(event: DiscussionResponsePayload, logger: L
         current_count = updated_doc.get("currentPhase", 1) if updated_doc else 1
         
         # 2. 추천 아이템 리스트 변환 (Summary -> ReasoningDescription)
+        # TODO: Qdrant 구축 후 RAG 활성화
+        # dining_session = await db.read_one({"diningId": payload.dining_id})
+        # if dining_session:
+        #     dining_context = {
+        #         "budget": dining_session.get("budget"),
+        #         "dining_date": dining_session.get("diningDate"),
+        #         "member_count": len(dining_session.get("userIds") or []),
+        #     }
+        # else:
+        #     dining_context = {}
+        # try:
+        #     reason_map = await rag_reason_task(payload.final_restaurant_ids, dining_context)
+        # except Exception as rag_exc:
+        #     logger.warning(f"rag_reason_task failed, falling back to summary: {rag_exc}")
+        #     reason_map = {}
         items = [
             RecommendedItem(
                 restaurant_id=item.restaurant_id,
