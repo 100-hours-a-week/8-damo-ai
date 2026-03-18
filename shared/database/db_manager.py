@@ -170,8 +170,8 @@ class DBManager:
                         "restaurantCandidate": restaurant_candidates,
                         "phases": phases,
                         "updatedAt": now,
-                    },
-                    "$set": {"statusMessage": status_message}
+                        "statusMessage": status_message,
+                    }
                 }
 
                 # 거절된 식당이 있으면 push ($each 사용으로 리스트 병합)

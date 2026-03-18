@@ -1,0 +1,26 @@
+FROM vllm/vllm-openai:v0.15.0
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends curl && \
+    rm -rf /var/lib/apt/lists/*
+
+# Python 의존성 설치
+COPY requirements.txt ./requirements.txt
+COPY services/agent_dialogue/requirements.txt ./services/agent_dialogue/requirements.txt
+RUN pip install --no-cache-dir \
+    -r requirements.txt \
+    -r services/agent_dialogue/requirements.txt
+
+COPY . .
+
+RUN chmod +x services/agent_dialogue/start-kafka.sh
+
+ENV PYTHONPATH=/app
+ENV LOCAL_MODEL=HugJerry99/SKT-AX-4.0-Light-AWQ
+ENV LOCAL_BASE_URL=http://localhost:8000/v1
+ENV LOCAL_API_KEY=local
+ENV KAFKA_BOOTSTRAP_SERVERS=
+ENV HF_HOME=/workspace
+
+CMD ["bash", "services/agent_dialogue/start-kafka.sh"]

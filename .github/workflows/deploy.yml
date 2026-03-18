@@ -270,17 +270,17 @@ jobs:
           CI_RESULT="${{ needs.ci.result }}"
           DEV_DEPLOY_RESULT="${{ needs.deploy_dev.result }}"
           PROD_DEPLOY_RESULT="${{ needs.deploy_prod.result }}"
-          
+
           if [ "${GITHUB_REF_NAME}" = "main" ]; then
             DEPLOY_RESULT="${PROD_DEPLOY_RESULT}"
           else
             DEPLOY_RESULT="${DEV_DEPLOY_RESULT}"
           fi
-          
+
           REF="${{ github.repository }}@${{ github.ref_name }}"
           RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
 
           curl -H "Content-Type: application/json" \
-                -X POST \
-              -d "{\"username\":\"AI CI/CD\",\"content\":\"🖥️ AI CI/CD 결과\\n- CI: **${CI_RESULT}**\\n- Deploy: **${DEPLOY_RESULT}**\\n🔗 [${REF}](${RUN_URL})\"}" \
-              ${{ secrets.DISCORD_WEBHOOK_URL }}
+               -X POST \
+               -d "{\"username\":\"AI CI/CD\",\"content\":\"🖥️ AI CI/CD 결과\\n- CI: **${CI_RESULT}**\\n- Deploy: **${DEPLOY_RESULT}**\\n🔗 [${REF}](${RUN_URL})\"}" \
+               ${{ secrets.DISCORD_WEBHOOK_URL }}

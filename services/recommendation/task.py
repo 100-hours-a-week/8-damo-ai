@@ -21,6 +21,8 @@ async def recommendation_task(body: Union[RecommendationRequestData, Recommendat
             "max_iterations": 3,
             "is_initial_workflow": True if log_type == "recommend" else False,
             "needs_discussion": True,
+            "filtered_restaurant": [],
+            "rejected_restaurant": [],
         }
 
         if body.dining_data.x != "DAMO_TEST":
@@ -47,7 +49,11 @@ async def recommendation_task(body: Union[RecommendationRequestData, Recommendat
                 "status_message": ["테스트 모드: 목업 데이터가 생성되었습니다."]
             }
         
-        logger.info(f"Background analysis completed successfully for dining_id: {body.dining_data.dining_id}")
     except Exception as e:
         logger.error(f"Error in recommendation for user {body.user_ids}: {str(e)}")
-    
+        return {
+            "filtered_restaurant": [],
+            "dining_id": body.dining_data.dining_id,
+            "status_message": [f"오류 발생: {str(e)}"],
+            "needs_discussion": False,
+        }

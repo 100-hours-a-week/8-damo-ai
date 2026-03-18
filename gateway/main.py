@@ -23,7 +23,6 @@ from shared.utils.config import get_settings
 
 # ASGI 및 클라이언트 접속을 위한 모듈
 from services.core_service.modules.web_connections import health_check, log_check, lightning_request
-from services.core_service.modules.runpod_connections import RunPodClient
 
 # 서브 그래프
 from services.core_service.modules.persona.task import analyze_persona_task
@@ -48,21 +47,18 @@ app = AsgiFastStream(
         ("/ai/lightning_request", lightning_request)
     ]
 )
-runpod = RunPodClient()
 # ------------------------------------------------
 # 회식 관련
 # 1. 회식 추천
 @broker.subscriber(service.get_recommendation_request_topic(), group_id=settings.KAFKA_GROUP_ID)
 async def handle_recommendation(event: RecommendationRequestPayload, logger: Logger, message = Context()):
     logger.info("get recommendation request")
-    # 백그라운드가 아닌 현재 흐름에서 에러를 체크하기 위해 await 사용
     try:
-        is_healthy = await runpod.health_check()
-        if not is_healthy:
-            logger.error("RunPod is not healthy")
-            raise Exception("RunPod is not healthy")
         correlation_id = str(getattr(message, "correlation_id", "unknown"))
         final_state = await recommendation_task(event.payload, correlation_id, "recommend")
+        if final_state is None:
+            logger.error("recommendation_task returned None, aborting")
+            return
 
         db = DBManager()
         await db.save_dining_session(final_state) 
@@ -94,11 +90,6 @@ async def handle_recommendation(event: RecommendationRequestPayload, logger: Log
 async def handle_recommendation_refresh(event: RecommendationRefreshRequestPayload, logger: Logger, message = Context()):
     logger.info("get recommendation refresh request")
     try:
-        # 재추천 가능 여부 체크
-        is_healthy = await runpod.health_check()
-        if not is_healthy:
-            logger.error("RunPod is not healthy")
-            raise Exception("RunPod is not healthy")
         correlation_id = str(getattr(message, "correlation_id", "unknown"))
         final_state = await recommendation_task(event.payload, correlation_id, "refresh")
 
@@ -189,7 +180,7 @@ async def handle_discussion_response(event: DiscussionResponsePayload, logger: L
         items = [
             RecommendedItem(
                 restaurant_id=item.restaurant_id,
-                reasoning_description=item.summary
+                reasoning_description=reason_map.get(item.restaurant_id) or item.summary
             ) for item in payload.final_restaurant_ids
         ]
         
@@ -266,10 +257,6 @@ async def handle_receipt_ocr(event: ReceiptOCRRequestPayload, logger: Logger, me
         raise e
 # ------------------------------------------------
 
-
-@app.after_shutdown
-async def cleanup():
-    await runpod.close()
 
 # 메인 함수
 async def main():
