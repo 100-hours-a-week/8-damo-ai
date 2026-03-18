@@ -164,22 +164,8 @@ async def handle_discussion_request(
         )
         return
 
-    # 최종 결과: 5개 미만이면 candidate_pool에서 보충
+    # 보충 및 추천이유 생성은 reason_generator 노드에서 처리됨
     final_selection = list(result.get("final_selection", []))
-    if len(final_selection) < 5:
-        existing_ids = {item.get("restaurant_id", "") for item in final_selection}
-        for r in result.get("candidate_pool", []):
-            if len(final_selection) >= 5:
-                break
-            rid = str(r.get("_id", ""))
-            if rid not in existing_ids:
-                final_selection.append(
-                    {
-                        "restaurant_id": rid,
-                        "reason": f"{r.get('place_name', '')} — 후보 풀 기반 보충 선정",
-                    }
-                )
-                existing_ids.add(rid)
 
     response_data = DiscussionResponseData(
         dining_id=dining_id,
