@@ -3,27 +3,30 @@
 gateway.main은 module-level에서 여러 외부 의존성을 초기화하므로,
 import 전에 sys.modules에 stub을 주입한다.
 """
+import importlib
 import sys
 from types import ModuleType
 from unittest.mock import MagicMock, AsyncMock, patch
 
 
 def _stub_missing_modules() -> None:
-    """로컬에 설치되지 않은 heavy 의존성 stub 처리."""
-    stubs = [
-        "google.cloud.vision",
-        "google.cloud.vision_v1",
-        "google.oauth2",
-        "google.oauth2.service_account",
-    ]
-    for name in stubs:
+    """설치되지 않은 의존성만 stub으로 등록.
+
+    부모 패키지(google, google.cloud 등)는 실제 import를 먼저 시도해서
+    google.genai 등 다른 google 패키지가 깨지지 않도록 한다.
+    """
+    # 부모 네임스페이스는 실제 패키지를 우선 import
+    for parent in ["google", "google.cloud", "google.oauth2"]:
+        if parent not in sys.modules:
+            try:
+                importlib.import_module(parent)
+            except ImportError:
+                sys.modules[parent] = ModuleType(parent)
+
+    # leaf 모듈만 stub 등록
+    for name in ["google.cloud.vision", "google.cloud.vision_v1", "google.oauth2.service_account"]:
         if name not in sys.modules:
-            # 부모 패키지도 함께 등록
-            parts = name.split(".")
-            for i in range(1, len(parts) + 1):
-                pkg = ".".join(parts[:i])
-                if pkg not in sys.modules:
-                    sys.modules[pkg] = ModuleType(pkg)
+            sys.modules[name] = ModuleType(name)
 
 
 def _import_gateway_main_with_mock() -> None:
