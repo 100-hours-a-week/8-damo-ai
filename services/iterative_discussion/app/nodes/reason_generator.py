@@ -73,12 +73,40 @@ async def _generate_reason(
         return restaurant_id, discussion_reason
 
 
+def _supplement_to_five(
+    final_selection: List[Dict[str, Any]],
+    candidate_pool: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    """5개 미만이면 candidate_pool에서 보충 (reason은 빈 문자열로 — LLM이 생성)."""
+    if len(final_selection) >= 5:
+        return final_selection
+
+    result = list(final_selection)
+    existing_ids = {item.get("restaurant_id", "") for item in result}
+    for r in candidate_pool:
+        if len(result) >= 5:
+            break
+        rid = str(r.get("_id", ""))
+        if rid not in existing_ids:
+            result.append({
+                "restaurant_id": rid,
+                "place_name": r.get("place_name", ""),
+                "reason": "",
+            })
+            existing_ids.add(rid)
+    return result
+
+
 @observe(name="reason_generator")
 async def reason_generator(state: ConsensusState) -> dict:
-    """Node 7: 최종 선정 식당에 대해 LLM으로 추천이유 생성."""
+    """Node 7: 5개 보충 후 각 식당에 대해 LLM으로 추천이유 생성."""
     final_selection: List[Dict[str, Any]] = state.get("final_selection", [])
+    candidate_pool: List[Dict[str, Any]] = state.get("candidate_pool", [])
     dining_data: Dict[str, Any] = state.get("dining_data", {})
     user_ids: List[int] = state.get("user_ids", [])
+
+    # 5개 미만이면 먼저 보충
+    final_selection = _supplement_to_five(final_selection, candidate_pool)
 
     if not final_selection:
         logger.warning("[Node7] final_selection이 비어있어 reason_generator를 건너뜁니다.")
