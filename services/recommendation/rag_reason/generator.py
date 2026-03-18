@@ -26,57 +26,69 @@ async def generate_reason_for_restaurant(
     vector_store: Any,
     restaurants_collection: Any,
 ) -> tuple[str, str]:
-    """Return (restaurant_id, reasoning_description) using RAG, fallback to summary.
+    """Return (restaurant_id, reasoning_description) using RAG.
+
+    MongoDB/Qdrant 조회 실패 시에도 LLM 호출을 시도하며,
+    LLM 자체 실패 시에만 generic fallback을 반환한다.
 
     Args:
         restaurants_collection: A Motor collection handle (no shared mutable state).
     """
+    GENERIC_FALLBACK = "예산과 위치를 고려한 최적의 회식 장소입니다."
+
+    # MongoDB 조회 시도 — 실패해도 LLM 호출은 계속
+    restaurant = None
     try:
-        try:
-            oid = ObjectId(restaurant_id)
-        except InvalidId:
-            logger.error(f"Invalid restaurant ObjectId: {restaurant_id}")
-            return restaurant_id, summary
-
+        oid = ObjectId(restaurant_id)
         restaurant = await restaurants_collection.find_one({"_id": oid})
-        if not restaurant:
-            return restaurant_id, summary
+    except (InvalidId, Exception):
+        pass
 
-        reviews = await retrieve_reviews(restaurant, vector_store)
-
-        if reviews:
-            review_excerpts = "\n".join(
-                f"- {doc.page_content[:200]}" for doc in reviews
-            )
-        else:
-            review_excerpts = "리뷰 정보가 없습니다."
-
+    if restaurant:
+        reviews = []
+        if vector_store is not None:
+            try:
+                reviews = await retrieve_reviews(restaurant, vector_store)
+            except Exception:
+                pass
+        review_excerpts = (
+            "\n".join(f"- {doc.page_content[:200]}" for doc in reviews)
+            if reviews
+            else "리뷰 정보가 없습니다."
+        )
         menus = restaurant.get("menus", [])
         top_menus = ", ".join(
             m.get("title") or m.get("name", "") for m in menus[:3] if m.get("title") or m.get("name")
         )
+        place_name = restaurant.get("place_name") or restaurant.get("name", "")
+        category_detail = restaurant.get("category_detail", "")
+    else:
+        review_excerpts = "리뷰 정보가 없습니다."
+        top_menus = "정보 없음"
+        place_name = summary
+        category_detail = ""
 
+    try:
         user_prompt = RAG_REASON_USER_PROMPT.format(
             budget=dining_context.get("budget", ""),
             member_count=dining_context.get("member_count", ""),
             dining_date=dining_context.get("dining_date", ""),
-            place_name=restaurant.get("place_name") or restaurant.get("name", ""),
-            category_detail=restaurant.get("category_detail", ""),
-            top_menus=top_menus or "정보 없음",
+            place_name=place_name,
+            category_detail=category_detail,
+            top_menus=top_menus,
             review_excerpts=review_excerpts,
         )
-
         messages = [
             SystemMessage(content=RAG_REASON_SYSTEM_PROMPT),
             HumanMessage(content=user_prompt),
         ]
         response = await llm.ainvoke(messages)
         reason = response.content.strip()
-        return restaurant_id, reason if reason else summary
+        return restaurant_id, reason if reason else GENERIC_FALLBACK
 
     except Exception as e:
-        logger.warning(f"generate_reason_for_restaurant failed for {restaurant_id}: {e}")
-        return restaurant_id, summary
+        logger.warning(f"generate_reason_for_restaurant LLM failed for {restaurant_id}: {e}")
+        return restaurant_id, GENERIC_FALLBACK
 
 
 async def rag_reason_task(
@@ -98,8 +110,8 @@ async def rag_reason_task(
     try:
         vector_store = await get_vector_store()
     except Exception as e:
-        logger.warning(f"rag_reason_task: failed to connect to Qdrant: {e}")
-        return {item.restaurant_id: item.summary or "" for item in final_restaurants}
+        logger.warning(f"rag_reason_task: Qdrant 연결 실패, 리뷰 없이 진행: {e}")
+        vector_store = None
 
     # Single DBManager; access the collection directly to avoid set_collection race
     db = DBManager()
@@ -119,11 +131,12 @@ async def rag_reason_task(
 
     results = await asyncio.gather(*tasks, return_exceptions=True)
 
+    _GENERIC_FALLBACK = "예산과 위치를 고려한 최적의 회식 장소입니다."
     reason_map: dict[str, str] = {}
     for item, result in zip(final_restaurants, results):
         if isinstance(result, Exception):
             logger.warning(f"rag_reason_task: exception for {item.restaurant_id}: {result}")
-            reason_map[item.restaurant_id] = item.summary or ""
+            reason_map[item.restaurant_id] = _GENERIC_FALLBACK
         else:
             rid, reason = result
             reason_map[rid] = reason
