@@ -1,6 +1,6 @@
 FROM vllm/vllm-openai:v0.15.0
 
-ENTRYPOINT []
+ENTRYPOINT ["/bin/bash", "services/agent_dialogue/start-kafka.sh"]
 
 WORKDIR /app
 
@@ -25,4 +25,4 @@ ENV LOCAL_API_KEY=local
 ENV KAFKA_BOOTSTRAP_SERVERS=
 ENV HF_HOME=/workspace
 
-CMD ["bash", "services/agent_dialogue/start-kafka.sh"]
+CMD []
