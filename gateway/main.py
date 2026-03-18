@@ -180,7 +180,7 @@ async def handle_discussion_response(event: DiscussionResponsePayload, logger: L
         items = [
             RecommendedItem(
                 restaurant_id=item.restaurant_id,
-                reasoning_description=reason_map.get(item.restaurant_id) or item.summary
+                reasoning_description=item.summary
             ) for item in payload.final_restaurant_ids
         ]
         
