@@ -49,7 +49,7 @@ async def retrieve_reviews(
         payload_filter = Filter(
             must=[
                 FieldCondition(
-                    key="metadata.restaurant_id",
+                    key="restaurant_id",
                     match=MatchValue(value=restaurant_id),
                 )
             ]
