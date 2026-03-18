@@ -62,6 +62,9 @@ async def handle_recommendation(event: RecommendationRequestPayload, logger: Log
             raise Exception("RunPod is not healthy")
         correlation_id = str(getattr(message, "correlation_id", "unknown"))
         final_state = await recommendation_task(event.payload, correlation_id, "recommend")
+        if final_state is None:
+            logger.error("recommendation_task returned None, aborting")
+            return
 
         db = DBManager()
         await db.save_dining_session(final_state) 
