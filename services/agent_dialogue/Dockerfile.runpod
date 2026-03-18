@@ -5,6 +5,9 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends curl && \
     rm -rf /var/lib/apt/lists/*
 
+# LiteLLM 프록시 설치
+RUN pip install --no-cache-dir "litellm>=1.50.0,<2.0.0"
+
 # Python 의존성 설치
 COPY requirements.txt ./requirements.txt
 COPY services/agent_dialogue/requirements.txt ./services/agent_dialogue/requirements.txt
@@ -17,10 +20,12 @@ COPY . .
 RUN chmod +x services/agent_dialogue/start-kafka.sh
 
 ENV PYTHONPATH=/app
-ENV LOCAL_MODEL=HugJerry99/SKT-AX-4.0-Light-AWQ
+# 실제 HuggingFace 모델 경로 — 모델 교체 시 이 값만 변경
+ENV VLLM_MODEL=HugJerry99/SKT-AX-4.0-Light-AWQ
+# 클라이언트가 사용하는 LiteLLM 모델 별칭 — 모델 교체해도 변경 불필요
+ENV LOCAL_MODEL=local-model
 ENV LOCAL_BASE_URL=http://localhost:8000/v1
 ENV LOCAL_API_KEY=local
-ENV KAFKA_BOOTSTRAP_SERVERS=
 ENV HF_HOME=/workspace
 
 CMD ["bash", "services/agent_dialogue/start-kafka.sh"]

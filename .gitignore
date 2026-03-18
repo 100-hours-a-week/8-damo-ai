@@ -99,3 +99,4 @@ scripts/run_golden_eval.py
 scripts/export_eval_results.py
 scripts/run_lightning_eval.py
 services/core_service/modules/lightning/label_lightning.py
+PLAN_PIPELINE_UNIFICATION.md

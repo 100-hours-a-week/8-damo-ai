@@ -9,7 +9,24 @@ def set_test_env():
         "OPENAI_API_KEY": "fake",
         "LANGFUSE_SECRET_KEY": "fake",
         "LANGFUSE_PUBLIC_KEY": "fake",
-        "LANGFUSE_BASE_URL": "http://localhost"
+        "LANGFUSE_BASE_URL": "http://localhost",
+        "AWS_ENDPOINT_URL": "http://localhost",
+        "AWS_REGION": "ap-northeast-2",
+        "AWS_BUCKET_NAME": "fake-bucket",
+        "AWS_ACCESS_KEY_ID": "fake",
+        "AWS_SECRET": "fake",
+        "LANGSMITH_API_KEY": "fake",
+        "OPENROUTER_API_KEY": "fake",
+        "OPENROUTER_MODEL": "fake",
+        "KAFKA_BOOTSTRAP_SERVERS": "localhost:9092",
+        "RUNPOD_API_KEY": "fake",
+        "RUNPOD_API_URL": "http://localhost",
+        "QDRANT_URL": "http://localhost:6333",
+        "QDRANT_API_KEY": "fake",
+        "QDRANT_COLLECTION_NAME": "fake",
+        "LOCAL_BASE_URL": "http://localhost:8000/v1",
+        "LOCAL_API_KEY": "fake",
+        "LOCAL_MODEL": "fake-model",
     }
     for key, value in envs.items():
         if key not in os.environ:

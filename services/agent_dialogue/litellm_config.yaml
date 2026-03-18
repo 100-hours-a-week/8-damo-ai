@@ -1,0 +1,17 @@
+# 이 파일은 참고용 템플릿입니다.
+# 실제 설정은 start-kafka.sh에서 VLLM_MODEL 환경변수를 치환하여 /tmp/litellm_config.yaml로 동적 생성됩니다.
+#
+# 모델 교체 방법:
+#   VLLM_MODEL=meta-llama/Llama-3.1-8B-Instruct 환경변수만 변경
+#   클라이언트 측 LOCAL_MODEL=local-model 은 그대로 유지
+
+model_list:
+  - model_name: local-model
+    litellm_params:
+      model: openai/<VLLM_MODEL>   # start-kafka.sh에서 치환됨
+      api_base: http://127.0.0.1:8001/v1
+      api_key: local
+
+litellm_settings:
+  request_timeout: 120
+  drop_params: true

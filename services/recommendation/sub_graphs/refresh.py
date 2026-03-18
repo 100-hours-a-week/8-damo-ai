@@ -1,7 +1,11 @@
+import logging
+
 from langgraph.graph import StateGraph, START, END
 from langgraph.types import Command
 from services.recommendation.state import RecommendationState
 from shared.database.db_manager import DBManager
+
+logger = logging.getLogger(__name__)
 
 # 전역 사용
 db_manager = DBManager()
@@ -19,14 +23,14 @@ async def is_user_group_valid(state: RecommendationState) -> RecommendationState
     prev_user_ids = dining_session.get("userIds")
 
     if set(current_user_ids) == set(prev_user_ids):
-        print("same user!!!!!")
+        logger.info("[REFRESH] 동일 유저 그룹, DB 후보 확인: dining_id=%s", state.get("dining_id"))
         return Command(update={
             "iteration_count": dining_session.get("currentPhase", 0), 
             "error_message": f"User ids are same: {state.get('dining_id')}",
             "status_message": f"회식 세션(ID: {state.get('dining_id')})에 참여한 유저가 변경되지 않았습니다."
         }, goto="is_remaining_candidate")
     else:
-        print("different user!!!!!")
+        logger.info("[REFRESH] 유저 그룹 변경, AI 신규 추천으로: dining_id=%s", state.get("dining_id"))
         return Command(update={
             "error_message": f"User ids are different: {state.get('dining_id')}",
             "status_message": f"회식 세션(ID: {state.get('dining_id')})에 참여한 유저가 변경되었습니다."
@@ -74,16 +78,15 @@ async def is_remaining_candidate(state: RecommendationState) -> RecommendationSt
                 }
             )
 
-        # 5. 결과 반환 (AI 토론 없이 즉시 응답 플래그 포함)
-        return Command(update={
-            "status_message": f"기존 후보군에서 남은 {len(new_candidate)}개의 식당을 추천합니다.",
+        # 5. 결과 반환 → bridge → agent_dialogue로 자연스럽게 진행
+        return {
+            "status_message": f"기존 후보군 {len(new_candidate)}개로 AI 토론 시작합니다.",
             "filtered_restaurant": new_candidate,
-            "needs_discussion": False
-        }, goto=END)
+        }
 
     except Exception as e:
         # 후보가 하나도 없거나 에러 발생 시 부모의 recommend(AI 연산) 노드로 이동
-        print(f"refresh-fallback-to-ai: {e}")
+        logger.info("[REFRESH] DB 후보 소진, AI 신규 추천으로 전환: dining_id=%s, reason=%s", dining_id, e)
         return Command(update={
             "error_message": f"No candidate restaurants found: {dining_id}",
             "status_message": "보여드릴 남은 후보가 없어 AI 신규 추천을 시작합니다."
