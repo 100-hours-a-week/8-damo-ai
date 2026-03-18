@@ -15,6 +15,7 @@ from services.iterative_discussion.app.nodes.restaurant_summarizer import (
 )
 from services.iterative_discussion.app.nodes.persona_factory import persona_factory
 from services.iterative_discussion.app.nodes.persona_voting import persona_voting
+from services.iterative_discussion.app.nodes.reason_generator import reason_generator
 from services.iterative_discussion.app.nodes.self_evolution import self_evolution
 
 
@@ -62,6 +63,7 @@ def build_consensus_graph() -> StateGraph:
     graph.add_node("multi_agent_dialogue", multi_agent_dialogue)
     graph.add_node("consensus_assessment", consensus_assessment)
     graph.add_node("persona_voting", persona_voting)
+    graph.add_node("reason_generator", reason_generator)
 
     # 엔트리
     graph.set_entry_point("persona_factory")
@@ -109,6 +111,7 @@ def build_consensus_graph() -> StateGraph:
         },
     )
 
-    graph.add_edge("persona_voting", END)
+    graph.add_edge("persona_voting", "reason_generator")
+    graph.add_edge("reason_generator", END)
 
     return graph.compile()
