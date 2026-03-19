@@ -4,6 +4,7 @@ import logging
 from faststream import Context, Logger
 from faststream.asgi import AsgiFastStream
 
+from shared.utils.logging_config import setup_logging
 from shared.stream.service import KafkaService
 from shared.database.db_manager import DBManager
 from shared.schemas.stream_schema import (
@@ -27,6 +28,8 @@ from services.core_service.modules.persona.task import analyze_persona_task
 from services.recommendation.task import recommendation_task
 from services.recommendation.sub_graphs.fix import fix_task
 from services.core_service.modules.ocr.service import GoogleVisionService
+
+setup_logging()  # 반드시 다른 서비스 import 전에 호출
 
 logger = logging.getLogger(__name__)
 
