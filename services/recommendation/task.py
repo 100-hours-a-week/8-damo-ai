@@ -3,7 +3,6 @@ import logging
 import time
 from typing import Callable, Coroutine, Optional, Union
 
-from langfuse import get_client as _get_lf_client
 from langfuse.langchain import CallbackHandler
 
 from shared.schemas.stream_schema import RecommendationRequestData, RecommendationRefreshRequestData
@@ -69,32 +68,26 @@ async def recommendation_task(
     t0 = time.monotonic()
     try:
         pipeline = build_pipeline_graph()
-        client = _get_lf_client()
-        async with client.start_as_current_span(name=f"pipeline-{log_type}"):
-            client.update_current_trace(
-                session_id=correlation_id,
-                user_id=str(dining_id),
-                tags=[log_type],
-            )
-            trace_id = client.get_current_trace_id()
-            handler = CallbackHandler(
-                public_key=settings.LANGFUSE_PUBLIC_KEY,
-                trace_context={"trace_id": trace_id},
-            )
-            config = {
-                "run_name": f"{log_type}-pipeline",
-                "configurable": {"on_persona_speak": on_persona_speak},
-                "callbacks": [handler],
-            }
-            logger.info("[%s] 그래프 ainvoke 시작", log_type.upper())
-            final_state = await pipeline.ainvoke(initial_state, config=config)
-            logger.info(
-                "[%s] 그래프 ainvoke 완료: is_error=%s, filtered_restaurant=%d개, final_selection=%d개",
-                log_type.upper(),
-                final_state.get("is_error"),
-                len(final_state.get("filtered_restaurant", [])),
-                len(final_state.get("final_selection", [])),
-            )
+        handler = CallbackHandler(
+            public_key=settings.LANGFUSE_PUBLIC_KEY,
+            session_id=correlation_id,
+            user_id=str(dining_id),
+            tags=[log_type],
+        )
+        config = {
+            "run_name": f"{log_type}-pipeline",
+            "configurable": {"on_persona_speak": on_persona_speak},
+            "callbacks": [handler],
+        }
+        logger.info("[%s] 그래프 ainvoke 시작", log_type.upper())
+        final_state = await pipeline.ainvoke(initial_state, config=config)
+        logger.info(
+            "[%s] 그래프 ainvoke 완료: is_error=%s, filtered_restaurant=%d개, final_selection=%d개",
+            log_type.upper(),
+            final_state.get("is_error"),
+            len(final_state.get("filtered_restaurant", [])),
+            len(final_state.get("final_selection", [])),
+        )
         elapsed = time.monotonic() - t0
         logger.info(
             "[%s] 파이프라인 완료: dining_id=%s, final_selection=%d개, 소요=%.1fs",
@@ -103,7 +96,7 @@ async def recommendation_task(
             len(final_state.get("final_selection", [])),
             elapsed,
         )
-        client.flush()
+        handler.flush()
         return final_state
     except Exception:
         elapsed = time.monotonic() - t0
