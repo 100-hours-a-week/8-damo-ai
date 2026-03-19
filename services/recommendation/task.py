@@ -3,11 +3,9 @@ import logging
 import time
 from typing import Callable, Coroutine, Optional, Union
 
-from langfuse.langchain import CallbackHandler
-
 from shared.schemas.stream_schema import RecommendationRequestData, RecommendationRefreshRequestData
 from services.recommendation.graph import build_pipeline_graph
-from shared.utils.config import settings
+from shared.monitoring import get_langfuse_handler, get_langfuse_client
 
 logger = logging.getLogger(__name__)
 
@@ -68,16 +66,18 @@ async def recommendation_task(
     t0 = time.monotonic()
     try:
         pipeline = build_pipeline_graph()
-        handler = CallbackHandler(
-            public_key=settings.LANGFUSE_PUBLIC_KEY,
+        lf_client = get_langfuse_client()
+        lf_client.trace(
+            name=f"{log_type}-pipeline",
             session_id=correlation_id,
             user_id=str(dining_id),
             tags=[log_type],
         )
+        handler = get_langfuse_handler()
         config = {
             "run_name": f"{log_type}-pipeline",
             "configurable": {"on_persona_speak": on_persona_speak},
-            "callbacks": [handler],
+            "callbacks": [handler] if handler else [],
         }
         logger.info("[%s] 그래프 ainvoke 시작", log_type.upper())
         final_state = await pipeline.ainvoke(initial_state, config=config)
