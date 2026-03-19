@@ -3,9 +3,9 @@ import logging
 import time
 from typing import Callable, Coroutine, Optional, Union
 
+from shared.monitoring import get_langfuse_handler  # env var 주입을 위해 graph보다 먼저 임포트
 from shared.schemas.stream_schema import RecommendationRequestData, RecommendationRefreshRequestData
 from services.recommendation.graph import build_pipeline_graph
-from shared.monitoring import get_langfuse_handler
 
 logger = logging.getLogger(__name__)
 
