@@ -61,6 +61,7 @@ async def recommendation_task(
         return {
             "filtered_restaurant": [],
             "dining_id": dining_id,
+            "dining_data": initial_state["dining_data"],
             "final_selection": [],
             "status_message": ["테스트 모드: 목업 데이터가 생성되었습니다."],
         }
@@ -107,6 +108,7 @@ async def recommendation_task(
         return {
             "filtered_restaurant": [],
             "dining_id": dining_id,
+            "dining_data": initial_state["dining_data"],
             "final_selection": [],
             "status_message": ["파이프라인 오류가 발생했습니다."],
         }
