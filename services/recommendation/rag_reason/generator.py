@@ -6,6 +6,7 @@ from bson import ObjectId
 from bson.errors import InvalidId
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, SystemMessage
+from langfuse import get_client as _get_lf_client, observe
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from shared.database.db_manager import DBManager
@@ -18,6 +19,7 @@ from .prompts import RAG_REASON_SYSTEM_PROMPT, RAG_REASON_USER_PROMPT
 logger = logging.getLogger("faststream")
 
 
+@observe(name="rag_reason_generation", as_type="generation")
 async def generate_reason_for_restaurant(
     restaurant_id: str,
     summary: str,
@@ -84,6 +86,14 @@ async def generate_reason_for_restaurant(
         ]
         response = await llm.ainvoke(messages)
         reason = response.content.strip()
+        if hasattr(response, "usage_metadata") and response.usage_metadata:
+            _get_lf_client().update_current_generation(
+                model=llm.model_name,
+                usage_details={
+                    "input_tokens": response.usage_metadata.get("input_tokens"),
+                    "output_tokens": response.usage_metadata.get("output_tokens"),
+                },
+            )
         return restaurant_id, reason if reason else GENERIC_FALLBACK
 
     except Exception as e:

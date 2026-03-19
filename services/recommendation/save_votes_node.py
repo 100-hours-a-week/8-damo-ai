@@ -4,12 +4,15 @@
 """
 import logging
 
+from langfuse import observe
+
 from shared.database.db_manager import DBManager
 from services.recommendation.state import PipelineState
 
 logger = logging.getLogger(__name__)
 
 
+@observe(name="save_votes")
 async def save_votes_node(state: PipelineState) -> dict:
     """persona_votes를 dining_sessions.phases에 push."""
     dining_id = state.get("dining_id")

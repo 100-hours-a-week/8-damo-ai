@@ -6,7 +6,7 @@ import logging
 import time
 from typing import Any, Callable, Coroutine
 
-from langfuse.decorators import langfuse_context
+from langfuse import get_client as _get_lf_client
 
 from services.agent_dialogue.app.utils.logging_config import setup_logging
 
@@ -97,7 +97,7 @@ async def run_agent_dialogue(
     correlation_id를 Langfuse session_id로 사용해 전체 흐름을 단일 세션으로 추적한다.
     """
     dining_id = req.dining_data.dining_id
-    langfuse_context.update_current_trace(session_id=correlation_id)
+    _get_lf_client().update_current_trace(session_id=correlation_id)
 
     initial_state = create_initial_state(
         user_ids=req.user_ids,

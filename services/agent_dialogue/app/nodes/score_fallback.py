@@ -1,6 +1,8 @@
 import logging
 from typing import Any, Dict, List
 
+from langfuse import observe
+
 from services.agent_dialogue.app.engine.state import AgentDialogueState
 
 logger = logging.getLogger(__name__)
@@ -8,6 +10,7 @@ logger = logging.getLogger(__name__)
 _TARGET = 5
 
 
+@observe(name="score_fallback")
 def score_fallback(state: AgentDialogueState) -> dict:
     """모든 대화 완료 후 추천이 5개 미만이면 preselect score 순으로 채운다."""
     recommended: List[Dict[str, Any]] = list(state.get("recommended_restaurants", []))
