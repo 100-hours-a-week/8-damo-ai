@@ -8,7 +8,6 @@ from typing import Any, Dict, List, Optional, Tuple
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.runnables import RunnableConfig
 from langfuse import get_client, observe
-from langfuse.decorators import langfuse_context
 from services.agent_dialogue.app.engine.state import AgentDialogueState
 from services.agent_dialogue.app.engine.llm_factory import get_chat_llm
 from shared.utils.config import settings
@@ -278,9 +277,6 @@ async def restaurant_dialogue(state: AgentDialogueState, config: RunnableConfig)
 
     configurable = (config or {}).get("configurable") or {}
     on_speak = configurable.get("on_persona_speak")
-    correlation_id = configurable.get("correlation_id")
-    if correlation_id:
-        langfuse_context.update_current_trace(session_id=correlation_id)
 
     dining_data = state.get("dining_data", {})
     user_data_list = state.get("user_data_list", [])

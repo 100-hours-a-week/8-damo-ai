@@ -5,12 +5,15 @@ dialogue_history를 dining_sessions에 저장해 향후 추천 이유 생성 등
 """
 import logging
 
+from langfuse import observe
+
 from shared.database.db_manager import DBManager
 from services.recommendation.state import PipelineState
 
 logger = logging.getLogger(__name__)
 
 
+@observe(name="save_dialogue")
 async def save_dialogue_node(state: PipelineState) -> dict:
     """dialogue_history를 dining_sessions.dialogueHistory에 저장."""
     dining_id = state.get("dining_id")

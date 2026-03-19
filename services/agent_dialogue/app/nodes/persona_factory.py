@@ -2,9 +2,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Tuple
 
-from langchain_core.runnables import RunnableConfig
 from langfuse import observe
-from langfuse.decorators import langfuse_context
 
 from shared.database.db_manager import DBManager
 from services.agent_dialogue.app.engine.state import AgentDialogueState
@@ -224,14 +222,10 @@ def _build_persona_prompt(user: Dict[str, Any]) -> str:
 
 
 @observe(name="persona_factory")
-async def persona_factory(state: AgentDialogueState, config: RunnableConfig = None) -> dict:
+async def persona_factory(state: AgentDialogueState) -> dict:
     """Node 1: user_ids로 DB에서 유저 데이터 조회 후 페르소나 프롬프트 생성.
     재추천 시 self_evolution 로직을 통합 실행하여 few-shot 피드백을 주입한다.
     """
-    correlation_id = ((config or {}).get("configurable") or {}).get("correlation_id")
-    if correlation_id:
-        langfuse_context.update_current_trace(session_id=correlation_id)
-
     user_ids = state.get("user_ids", [])
     logger.info("[Node1] persona_factory 시작: user_ids=%s", user_ids)
 

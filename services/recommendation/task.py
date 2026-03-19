@@ -3,9 +3,12 @@ import logging
 import time
 from typing import Callable, Coroutine, Optional, Union
 
+from langfuse import get_client as _get_lf_client
+from langfuse.langchain import CallbackHandler
+
 from shared.schemas.stream_schema import RecommendationRequestData, RecommendationRefreshRequestData
 from services.recommendation.graph import build_pipeline_graph
-from shared.monitoring import get_langfuse_handler, get_langfuse_client
+from shared.utils.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -62,24 +65,27 @@ async def recommendation_task(
             "status_message": ["테스트 모드: 목업 데이터가 생성되었습니다."],
         }
 
-    config = {
-        "run_name": f"{log_type}-task",
-        "configurable": {
-            "on_persona_speak": on_persona_speak,
-            "correlation_id": correlation_id,
-        },
-        "callbacks": [get_langfuse_handler()],
-        "metadata": {
-            "langfuse_user_id": f"{log_type}-{dining_id}",
-            "langfuse_session_id": correlation_id,
-            "langfuse_tags": [log_type],
-        },
-    }
-
     t0 = time.monotonic()
     try:
         pipeline = build_pipeline_graph()
-        final_state = await pipeline.ainvoke(initial_state, config=config)
+        client = _get_lf_client()
+        async with client.start_as_current_span(name=f"pipeline-{log_type}"):
+            client.update_current_trace(
+                session_id=correlation_id,
+                user_id=str(dining_id),
+                tags=[log_type],
+            )
+            trace_id = client.get_current_trace_id()
+            handler = CallbackHandler(
+                public_key=settings.LANGFUSE_PUBLIC_KEY,
+                trace_context={"trace_id": trace_id},
+            )
+            config = {
+                "run_name": f"{log_type}-pipeline",
+                "configurable": {"on_persona_speak": on_persona_speak},
+                "callbacks": [handler],
+            }
+            final_state = await pipeline.ainvoke(initial_state, config=config)
         elapsed = time.monotonic() - t0
         logger.info(
             "[%s] 파이프라인 완료: dining_id=%s, final_selection=%d개, 소요=%.1fs",
@@ -88,7 +94,7 @@ async def recommendation_task(
             len(final_state.get("final_selection", [])),
             elapsed,
         )
-        get_langfuse_client().flush()
+        client.flush()
         return final_state
     except Exception:
         elapsed = time.monotonic() - t0

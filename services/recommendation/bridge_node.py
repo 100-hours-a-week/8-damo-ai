@@ -5,11 +5,14 @@ agent_dialogue 전용 필드를 초기화한다.
 """
 import logging
 
+from langfuse import observe
+
 from services.recommendation.state import PipelineState
 
 logger = logging.getLogger(__name__)
 
 
+@observe(name="bridge")
 def bridge_node(state: PipelineState) -> dict:
     """filtered_restaurant → filtered_restaurant_ids 변환 + agent_dialogue 필드 초기화."""
     raw = state.get("filtered_restaurant", [])

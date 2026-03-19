@@ -7,6 +7,8 @@ import logging
 import time
 from typing import Any
 
+from langfuse import observe
+
 from shared.schemas.stream_schema import FinalRestaurant
 from services.recommendation.rag_reason import rag_reason_task
 from services.recommendation.state import PipelineState
@@ -16,6 +18,7 @@ logger = logging.getLogger(__name__)
 _GENERIC_REASON = "예산과 위치를 고려한 최적의 회식 장소입니다."
 
 
+@observe(name="rag_reason")
 async def rag_reason_node(state: PipelineState) -> dict:
     """recommended_restaurants → 5개 보충 → RAG 추천 이유 생성 → final_selection."""
     dining_id = state.get("dining_id")
