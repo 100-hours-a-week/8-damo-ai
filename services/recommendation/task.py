@@ -5,14 +5,11 @@ from typing import Callable, Coroutine, Optional, Union
 
 from shared.schemas.stream_schema import RecommendationRequestData, RecommendationRefreshRequestData
 from services.recommendation.graph import build_pipeline_graph
-from langfuse.decorators import langfuse_context, observe
-
 from shared.monitoring import get_langfuse_handler
 
 logger = logging.getLogger(__name__)
 
 
-@observe()
 async def recommendation_task(
     body: Union[RecommendationRequestData, RecommendationRefreshRequestData],
     correlation_id: str,
@@ -68,12 +65,6 @@ async def recommendation_task(
 
     t0 = time.monotonic()
     try:
-        langfuse_context.update_current_trace(
-            name=f"{log_type}-pipeline",
-            session_id=correlation_id,
-            user_id=str(dining_id),
-            tags=[log_type],
-        )
         pipeline = build_pipeline_graph()
         handler = get_langfuse_handler()
         config = {
