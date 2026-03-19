@@ -23,7 +23,11 @@ from shared.schemas.user_data import UserData
 from shared.schemas.update_persona_db_request import UpdatePersonaDBRequest
 from shared.utils.config import get_settings
 
-from services.core_service.modules.web_connections import health_check, log_check, lightning_request
+from services.core_service.modules.web_connections import (
+    health_check,
+    log_check,
+    lightning_request,
+)
 from services.core_service.modules.persona.task import analyze_persona_task
 from services.recommendation.task import recommendation_task
 from services.recommendation.sub_graphs.fix import fix_task
@@ -44,14 +48,19 @@ app = AsgiFastStream(
         ("/ai/lightning_request", lightning_request),
     ],
 )
+#
 
 
 # ── 1. 회식 추천 ─────────────────────────────────────────────────────────────
-@broker.subscriber(service.get_recommendation_request_topic(), group_id=settings.KAFKA_GROUP_ID)
+@broker.subscriber(
+    service.get_recommendation_request_topic(), group_id=settings.KAFKA_GROUP_ID
+)
 async def handle_recommendation(
     event: RecommendationRequestPayload, logger: Logger, message=Context()
 ):
-    logger.info("recommendation 요청 수신: dining_id=%s", event.payload.dining_data.dining_id)
+    logger.info(
+        "recommendation 요청 수신: dining_id=%s", event.payload.dining_data.dining_id
+    )
     try:
         correlation_id = str(getattr(message, "correlation_id", "unknown"))
         dining_id = event.payload.dining_data.dining_id
@@ -70,7 +79,10 @@ async def handle_recommendation(
             )
 
         result = await recommendation_task(
-            event.payload, correlation_id, "recommend", on_persona_speak=on_persona_speak
+            event.payload,
+            correlation_id,
+            "recommend",
+            on_persona_speak=on_persona_speak,
         )
         if result is None:
             logger.error("recommendation_task returned None: dining_id=%s", dining_id)
@@ -111,11 +123,16 @@ async def handle_recommendation(
 
 
 # ── 2. 회식 재추천 ───────────────────────────────────────────────────────────
-@broker.subscriber(service.get_recommendation_refresh_request_topic(), group_id=settings.KAFKA_GROUP_ID)
+@broker.subscriber(
+    service.get_recommendation_refresh_request_topic(), group_id=settings.KAFKA_GROUP_ID
+)
 async def handle_recommendation_refresh(
     event: RecommendationRefreshRequestPayload, logger: Logger, message=Context()
 ):
-    logger.info("recommendation refresh 요청 수신: dining_id=%s", event.payload.dining_data.dining_id)
+    logger.info(
+        "recommendation refresh 요청 수신: dining_id=%s",
+        event.payload.dining_data.dining_id,
+    )
     try:
         correlation_id = str(getattr(message, "correlation_id", "unknown"))
         dining_id = event.payload.dining_data.dining_id
@@ -167,11 +184,15 @@ async def handle_recommendation_refresh(
 
 
 # ── 4. 장소 확정 ─────────────────────────────────────────────────────────────
-@broker.subscriber(service.get_restaurant_confirmed_topic(), group_id=settings.KAFKA_GROUP_ID)
+@broker.subscriber(
+    service.get_restaurant_confirmed_topic(), group_id=settings.KAFKA_GROUP_ID
+)
 async def handle_restaurant_confirmed(
     event: RestaurantConfirmedPayload, logger: Logger, message=Context()
 ):
-    logger.info("restaurant confirmed: dining_id=%s", event.payload.dining_data.dining_id)
+    logger.info(
+        "restaurant confirmed: dining_id=%s", event.payload.dining_data.dining_id
+    )
     try:
         await fix_task(event)
     except Exception:
@@ -180,7 +201,9 @@ async def handle_restaurant_confirmed(
 
 
 # ── 5. 페르소나 업데이트 ──────────────────────────────────────────────────────
-@broker.subscriber(service.get_user_persona_update_topic(), group_id=settings.KAFKA_GROUP_ID)
+@broker.subscriber(
+    service.get_user_persona_update_topic(), group_id=settings.KAFKA_GROUP_ID
+)
 async def handle_persona_update(
     event: UserPersonaUpdatePayload, logger: Logger, message=Context()
 ):
@@ -207,7 +230,9 @@ async def handle_persona_update(
 
 
 # ── 6. OCR 요청 ──────────────────────────────────────────────────────────────
-@broker.subscriber(service.get_receipt_ocr_request_topic(), group_id=settings.KAFKA_GROUP_ID)
+@broker.subscriber(
+    service.get_receipt_ocr_request_topic(), group_id=settings.KAFKA_GROUP_ID
+)
 async def handle_receipt_ocr(
     event: ReceiptOCRRequestPayload, logger: Logger, message=Context()
 ):
