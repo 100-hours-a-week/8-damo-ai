@@ -96,7 +96,7 @@ async def recommendation_task(
             len(final_state.get("final_selection", [])),
             elapsed,
         )
-        handler.flush()
+        lf_client.flush()
         return final_state
     except Exception:
         elapsed = time.monotonic() - t0
