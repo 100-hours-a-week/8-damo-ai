@@ -29,7 +29,6 @@ from services.agent_dialogue.app.nodes.restaurant_dialogue import restaurant_dia
 from services.agent_dialogue.app.nodes.score_fallback import score_fallback
 
 from services.recommendation.state import PipelineState
-from shared.monitoring import get_langfuse_handler
 
 logger = logging.getLogger(__name__)
 
@@ -151,5 +150,4 @@ def build_pipeline_graph() -> Runnable:
     workflow.add_edge("save_dialogue_node", "rag_reason_node")
     workflow.add_edge("rag_reason_node", END)
 
-    handler = get_langfuse_handler()
-    return workflow.compile().with_config({"callbacks": [handler]})
+    return workflow.compile()

@@ -30,7 +30,11 @@ class LangfuseManager:
             return None
             
         if cls._handler is None:
-            cls._handler = CallbackHandler(public_key=settings.LANGFUSE_PUBLIC_KEY)
+            cls._handler = CallbackHandler(
+                public_key=settings.LANGFUSE_PUBLIC_KEY,
+                secret_key=settings.LANGFUSE_SECRET_KEY,
+                host=settings.LANGFUSE_BASE_URL,
+            )
         return cls._handler
 
 # Singleton 인스턴스 생성 프로세스를 단순화하기 위한 유틸리티 함수

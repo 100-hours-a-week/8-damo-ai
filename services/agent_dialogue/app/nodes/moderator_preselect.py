@@ -2,7 +2,9 @@ import logging
 from typing import Any, Dict, List
 
 from bson import ObjectId
+from langchain_core.runnables import RunnableConfig
 from langfuse import observe
+from langfuse.decorators import langfuse_context
 
 from shared.database.db_manager import DBManager
 from services.agent_dialogue.app.engine.state import AgentDialogueState
@@ -14,8 +16,12 @@ _BATCH_SIZE = 5
 
 
 @observe(name="moderator_preselect")
-async def moderator_preselect(state: AgentDialogueState) -> dict:
+async def moderator_preselect(state: AgentDialogueState, config: RunnableConfig = None) -> dict:
     """Node 2: filtered_restaurant_ids에서 배치 5개를 DB 조회 → score 정렬."""
+    correlation_id = ((config or {}).get("configurable") or {}).get("correlation_id")
+    if correlation_id:
+        langfuse_context.update_current_trace(session_id=correlation_id)
+
     all_ids = state.get("filtered_restaurant_ids", [])
     user_data_list = state.get("user_data_list", [])
     offset = state.get("restaurant_offset", 0)

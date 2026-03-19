@@ -64,13 +64,15 @@ async def recommendation_task(
 
     config = {
         "run_name": f"{log_type}-task",
-        "configurable": {"on_persona_speak": on_persona_speak},
+        "configurable": {
+            "on_persona_speak": on_persona_speak,
+            "correlation_id": correlation_id,
+        },
         "callbacks": [get_langfuse_handler()],
         "metadata": {
             "langfuse_user_id": f"{log_type}-{dining_id}",
             "langfuse_session_id": correlation_id,
             "langfuse_tags": [log_type],
-            "correlation_id": correlation_id,
         },
     }
 
