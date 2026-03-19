@@ -27,12 +27,14 @@ async def moderator_preselect(state: AgentDialogueState) -> dict:
     )
 
     if not all_ids:
+        logger.warning("[Node2] filtered_restaurant_ids 비어있음")
         return {
             "is_error": True,
             "error_message": "filtered_restaurant_ids가 비어있습니다.",
         }
 
     if not user_data_list:
+        logger.warning("[Node2] user_data_list 비어있음")
         return {
             "is_error": True,
             "error_message": "user_data_list가 비어있습니다. Node 1을 먼저 실행하세요.",
@@ -41,6 +43,7 @@ async def moderator_preselect(state: AgentDialogueState) -> dict:
     # 현재 배치 ID 슬라이싱
     batch_ids = all_ids[offset : offset + _BATCH_SIZE]
     if not batch_ids:
+        logger.warning("[Node2] batch_ids 비어있음: offset=%d", offset)
         return {
             "is_error": True,
             "error_message": f"offset={offset}부터 가져올 식당 ID가 없습니다.",

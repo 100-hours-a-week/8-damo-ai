@@ -86,7 +86,15 @@ async def recommendation_task(
                 "configurable": {"on_persona_speak": on_persona_speak},
                 "callbacks": [handler],
             }
+            logger.info("[%s] 그래프 ainvoke 시작", log_type.upper())
             final_state = await pipeline.ainvoke(initial_state, config=config)
+            logger.info(
+                "[%s] 그래프 ainvoke 완료: is_error=%s, filtered_restaurant=%d개, final_selection=%d개",
+                log_type.upper(),
+                final_state.get("is_error"),
+                len(final_state.get("filtered_restaurant", [])),
+                len(final_state.get("final_selection", [])),
+            )
         elapsed = time.monotonic() - t0
         logger.info(
             "[%s] 파이프라인 완료: dining_id=%s, final_selection=%d개, 소요=%.1fs",

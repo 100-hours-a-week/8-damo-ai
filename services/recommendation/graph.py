@@ -37,14 +37,17 @@ logger = logging.getLogger(__name__)
 
 def _branch_initial_or_refresh(state: PipelineState) -> str:
     """is_initial_workflow 기준으로 recommend_sg / refresh_sg 분기."""
-    if state.get("is_initial_workflow", True):
-        return "recommend"
-    return "refresh"
+    branch = "recommend" if state.get("is_initial_workflow", True) else "refresh"
+    logger.info("[GRAPH] 분기 선택: %s", branch)
+    return branch
 
 
 def _check_error(state: PipelineState) -> str:
     """에러 발생 시 END로 단축."""
-    return "end" if state.get("is_error") else "continue"
+    if state.get("is_error"):
+        logger.warning("[GRAPH] 에러 감지 → END: %s", state.get("error_message"))
+        return "end"
+    return "continue"
 
 
 def _after_restaurant_dialogue(state: PipelineState) -> str:
