@@ -5,7 +5,9 @@ from typing import Callable, Coroutine, Optional, Union
 
 from shared.schemas.stream_schema import RecommendationRequestData, RecommendationRefreshRequestData
 from services.recommendation.graph import build_pipeline_graph
-from shared.monitoring import get_langfuse_handler, get_langfuse_client
+from langfuse import get_client as _get_lf_client
+
+from shared.monitoring import get_langfuse_handler
 
 logger = logging.getLogger(__name__)
 
@@ -65,14 +67,12 @@ async def recommendation_task(
 
     t0 = time.monotonic()
     try:
-        pipeline = build_pipeline_graph()
-        lf_client = get_langfuse_client()
-        lf_client.trace(
-            name=f"{log_type}-pipeline",
+        _get_lf_client().update_current_trace(
             session_id=correlation_id,
             user_id=str(dining_id),
             tags=[log_type],
         )
+        pipeline = build_pipeline_graph()
         handler = get_langfuse_handler()
         config = {
             "run_name": f"{log_type}-pipeline",
@@ -96,7 +96,8 @@ async def recommendation_task(
             len(final_state.get("final_selection", [])),
             elapsed,
         )
-        lf_client.flush()
+        if handler:
+            handler.flush()
         return final_state
     except Exception:
         elapsed = time.monotonic() - t0

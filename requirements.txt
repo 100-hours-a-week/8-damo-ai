@@ -2,7 +2,7 @@ pydantic
 pydantic-settings
 motor
 langchain
-langfuse<3.0.0
+langfuse
 langgraph
 langchain-openrouter
 langchain-openai
