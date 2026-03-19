@@ -23,7 +23,6 @@ from services.agent_dialogue.app.prompts.restaurant_templates import (
 )
 
 logger = logging.getLogger(__name__)
-langfuse_client = get_client()
 
 
 # ── 데이터 포맷 ────────────────────────────────────────────────────────────
@@ -171,7 +170,7 @@ async def _analyst_speak(
             "input_tokens": response.usage_metadata.get("input_tokens"),
             "output_tokens": response.usage_metadata.get("output_tokens"),
         }
-    langfuse_client.update_current_generation(**obs)
+    get_client().update_current_generation(**obs)
     return str(response.content)
 
 
@@ -198,7 +197,7 @@ async def _persona_react(
             "input_tokens": response.usage_metadata.get("input_tokens"),
             "output_tokens": response.usage_metadata.get("output_tokens"),
         }
-    langfuse_client.update_current_generation(**obs)
+    get_client().update_current_generation(**obs)
     return str(response.content)
 
 
@@ -242,7 +241,7 @@ async def _persona_vote(
             "input_tokens": response.usage_metadata.get("input_tokens"),
             "output_tokens": response.usage_metadata.get("output_tokens"),
         }
-    langfuse_client.update_current_generation(**obs)
+    get_client().update_current_generation(**obs)
     return _parse_vote_response(str(response.content))
 
 
