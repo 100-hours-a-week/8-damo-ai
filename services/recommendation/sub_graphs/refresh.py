@@ -12,28 +12,30 @@ db_manager = DBManager()
 db_manager.set_collection("dining_sessions")
 
 async def is_user_group_valid(state: RecommendationState) -> RecommendationState:
-    dining_session = await db_manager.read_one({"diningId": int(state.get("dining_id"))})
+    dining_id = state.get("dining_id")
+    dining_session = await db_manager.read_one({"diningId": int(dining_id)})
     if dining_session is None:
+        logger.warning("[REFRESH] dining_session 없음 → END: dining_id=%s", dining_id)
         return Command(update={
-            "error_message": f"Dining session not found: {state.get('dining_id')}",
-            "status_message": f"회식 세션(ID: {state.get('dining_id')}) 정보를 찾을 수 없어 추천을 중단합니다."
+            "error_message": f"Dining session not found: {dining_id}",
+            "status_message": f"회식 세션(ID: {dining_id}) 정보를 찾을 수 없어 추천을 중단합니다."
         }, goto=END)
     
     current_user_ids = state.get("user_ids")
     prev_user_ids = dining_session.get("userIds")
 
     if set(current_user_ids) == set(prev_user_ids):
-        logger.info("[REFRESH] 동일 유저 그룹, DB 후보 확인: dining_id=%s", state.get("dining_id"))
+        logger.info("[REFRESH] 동일 유저 그룹, DB 후보 확인: dining_id=%s", dining_id)
         return Command(update={
-            "iteration_count": dining_session.get("currentPhase", 0), 
-            "error_message": f"User ids are same: {state.get('dining_id')}",
-            "status_message": f"회식 세션(ID: {state.get('dining_id')})에 참여한 유저가 변경되지 않았습니다."
+            "iteration_count": dining_session.get("currentPhase", 0),
+            "error_message": f"User ids are same: {dining_id}",
+            "status_message": f"회식 세션(ID: {dining_id})에 참여한 유저가 변경되지 않았습니다."
         }, goto="is_remaining_candidate")
     else:
-        logger.info("[REFRESH] 유저 그룹 변경, AI 신규 추천으로: dining_id=%s", state.get("dining_id"))
+        logger.info("[REFRESH] 유저 그룹 변경, AI 신규 추천으로: dining_id=%s", dining_id)
         return Command(update={
-            "error_message": f"User ids are different: {state.get('dining_id')}",
-            "status_message": f"회식 세션(ID: {state.get('dining_id')})에 참여한 유저가 변경되었습니다."
+            "error_message": f"User ids are different: {dining_id}",
+            "status_message": f"회식 세션(ID: {dining_id})에 참여한 유저가 변경되었습니다."
         }, goto="recommend", graph=Command.PARENT)
 
 async def is_remaining_candidate(state: RecommendationState) -> RecommendationState:

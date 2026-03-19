@@ -1,7 +1,11 @@
+import logging
+
 from langgraph.graph import StateGraph, START, END
 from langgraph.types import Command
 from services.recommendation.state import RecommendationState
 from time import time
+
+logger = logging.getLogger(__name__)
 
 # 알러지 키워드 매핑
 ALLERGY_KEYWORDS = {
@@ -40,14 +44,19 @@ from shared.database.db_manager import DBManager
 async def distance_node(state: RecommendationState) -> RecommendationState:
     db_manager = DBManager()
     db_manager.set_collection("restaurants")
+    dining_id = state.get("dining_data", {}).get("dining_id") or state.get("dining_id")
     _X = float(state.get("dining_data", {}).get("x"))
     _Y = float(state.get("dining_data", {}).get("y"))
     MAX_DISTANCE = 1000 # 1km
 
+    logger.info("[DISTANCE] 시작: dining_id=%s, x=%s, y=%s", dining_id, _X, _Y)
+
     # 1. 거리 가까운 식당 가져오기
     restaurants = await db_manager.find_by_location(_X, _Y, MAX_DISTANCE)
-    
+    logger.info("[DISTANCE] 조회 결과: %d개", len(restaurants) if restaurants else 0)
+
     if not restaurants or len(restaurants) == 0:
+        logger.warning("[DISTANCE] 반경 내 식당 없음 → END: dining_id=%s", dining_id)
         return Command(update={
             "filtered_restaurant": [],
             "status_message": "필터링된 식당이 없습니다",
@@ -139,6 +148,7 @@ def _scoring_allergy(user_datas: list[dict], filtered_restaurant: list[dict]) ->
 
 # 알러지 노드
 async def allergy_node(state: RecommendationState) -> RecommendationState:
+    logger.info("[ALLERGY] 시작: user_ids=%s", state.get("user_ids"))
     db_manager = DBManager()
     db_manager.set_collection("users")
     user_datas = []
@@ -147,6 +157,7 @@ async def allergy_node(state: RecommendationState) -> RecommendationState:
             "id": { "$in": [str(user_id), int(user_id)] }
         })
         if user_data is None:
+            logger.warning("[ALLERGY] 유저 없음 → END: user_id=%s", user_id)
             return Command(
                 update={
                     "filtered_restaurant": [],
@@ -156,10 +167,11 @@ async def allergy_node(state: RecommendationState) -> RecommendationState:
                 goto=END
             )
         user_datas.append(user_data)
-    
+
     # 알러지 필터링
     filtered_restaurant = _scoring_allergy(user_datas, state.get("filtered_restaurant"))
-    print(filtered_restaurant)
+    logger.debug("[ALLERGY] 필터링 결과: %d개", len(filtered_restaurant))
+    logger.info("[ALLERGY] 완료: %d개 식당 생존", len(filtered_restaurant))
 
     return Command(update={
         "status_message": "알러지 필터링 완료"
@@ -167,6 +179,7 @@ async def allergy_node(state: RecommendationState) -> RecommendationState:
 
 # 예산 노드
 async def budget_node(state: RecommendationState) -> dict:
+    logger.info("[BUDGET] 시작: filtered_restaurant=%d개", len(state.get("filtered_restaurant", [])))
     start_time = time()
     total_budget = state["dining_data"].get("budget", 0)
     member_count = len(state["user_ids"])
@@ -281,8 +294,8 @@ async def budget_node(state: RecommendationState) -> dict:
     _final_filtered.sort(key=lambda x: x.get("total_score", 0), reverse=True)
     
     end_time = time()
-    print(f"예산 및 통합 점수 필터링 완료: {len(_final_filtered)}개 식당 생존 (통합 정렬 적용)")
-    print(f"예산 및 통합 점수 필터링 소요 시간: {end_time - start_time:.4f}초")
+    logger.debug("[BUDGET] 예산 및 통합 점수 필터링 소요 시간: %.4f초", end_time - start_time)
+    logger.info("[BUDGET] 완료: %d개 식당 생존 (통합 정렬 적용)", len(_final_filtered))
 
     return {
         "filtered_restaurant": _final_filtered,

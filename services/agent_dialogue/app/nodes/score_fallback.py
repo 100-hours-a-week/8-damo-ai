@@ -16,7 +16,10 @@ def score_fallback(state: AgentDialogueState) -> dict:
     recommended: List[Dict[str, Any]] = list(state.get("recommended_restaurants", []))
     needed = _TARGET - len(recommended)
 
+    logger.info("[Fallback] 시작: recommended=%d개, needed=%d개", len(recommended), needed)
+
     if needed <= 0:
+        logger.info("[Fallback] 완료: 이미 목표 달성, 추가 없음")
         return {}
 
     recommended_ids = {r["restaurant_id"] for r in recommended}
@@ -40,4 +43,5 @@ def score_fallback(state: AgentDialogueState) -> dict:
             ", ".join(added),
         )
 
+    logger.info("[Fallback] 완료: 최종 recommended=%d개", len(recommended))
     return {"recommended_restaurants": recommended}
