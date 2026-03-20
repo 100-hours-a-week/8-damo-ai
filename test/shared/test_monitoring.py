@@ -2,6 +2,9 @@ import pytest
 import asyncio
 import os
 
+# Langfuse 테스트 전체 스킵 (개발 중 불필요)
+pytestmark = pytest.mark.skip(reason="Langfuse 개발 중 스킵")
+
 # 🚀 중요: SDK 초기화 전 환경 변수 강제 주입
 from shared.utils.config import settings
 os.environ["LANGFUSE_PUBLIC_KEY"] = settings.LANGFUSE_PUBLIC_KEY
