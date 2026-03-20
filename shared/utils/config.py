@@ -1,4 +1,3 @@
-from typing import Optional
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
@@ -32,9 +31,10 @@ class Settings(BaseSettings):
     KAFKA_CLIENT_ID: str = "damo-ai-dev-gateway-client"
     KAFKA_AUTO_OFFSET_RESET: str = "earliest"
 
-    QDRANT_URL: str = "http://localhost:6333"
-    QDRANT_API_KEY: Optional[str] = None
-    QDRANT_COLLECTION_NAME: str = "restaurant_reviews"
+    NEO4J_URI: str = ""
+    NEO4J_USERNAME: str = "neo4j"
+    NEO4J_PASSWORD: str = ""
+    NEO4J_DATABASE: str = "neo4j"
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

@@ -60,6 +60,11 @@ Thumbs.db
 .env.local
 
 # ======================
+# docs
+# ======================
+docs/
+
+# ======================
 # etc
 # ======================
 services/iterative_discussion/eval/
@@ -98,5 +103,6 @@ services/agent_dialogue/start-vllm-litellm.sh
 scripts/run_golden_eval.py
 scripts/export_eval_results.py
 scripts/run_lightning_eval.py
+scripts/test_e2e_neo4j.py
 services/core_service/modules/lightning/label_lightning.py
 PLAN_PIPELINE_UNIFICATION.md

@@ -14,8 +14,7 @@ faststream[cli]
 uvicorn
 boto3
 google-cloud-vision
-qdrant-client[async]
-langchain-qdrant
+neo4j
 google-cloud-bigquery
 google-cloud-bigquery-storage
 pyarrow
