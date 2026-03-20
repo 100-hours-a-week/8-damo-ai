@@ -15,6 +15,8 @@ from langgraph.graph import StateGraph, START, END
 # 서브그래프
 from services.recommendation.sub_graphs.recommend import get_recommend_graph
 from services.recommendation.sub_graphs.refresh import get_refresh_graph
+from services.recommendation.sub_graphs.allergy import get_allergy_graph
+from services.recommendation.semantic_rerank_node import semantic_rerank_node
 
 # 브릿지 + 저장 노드
 from services.recommendation.bridge_node import bridge_node
@@ -87,6 +89,8 @@ def build_pipeline_graph() -> Runnable:
     # 서브그래프 노드 등록
     workflow.add_node("recommend", get_recommend_graph())
     workflow.add_node("refresh", get_refresh_graph())
+    workflow.add_node("allergy_sg", get_allergy_graph())
+    workflow.add_node("semantic_rerank", semantic_rerank_node)
 
     # 브릿지 노드
     workflow.add_node("bridge", bridge_node)
@@ -111,9 +115,19 @@ def build_pipeline_graph() -> Runnable:
         {"recommend": "recommend", "refresh": "refresh"},
     )
 
-    # 양쪽 모두 bridge로 수렴
-    workflow.add_edge("recommend", "bridge")
-    workflow.add_edge("refresh", "bridge")
+    # 양쪽 모두 allergy_sg → semantic_rerank → bridge 순서로 수렴
+    workflow.add_edge("recommend", "allergy_sg")
+    workflow.add_edge("refresh", "allergy_sg")
+    workflow.add_conditional_edges(
+        "allergy_sg",
+        _check_error,
+        {"continue": "semantic_rerank", "end": END},
+    )
+    workflow.add_conditional_edges(
+        "semantic_rerank",
+        _check_error,
+        {"continue": "bridge", "end": END},
+    )
 
     # bridge → persona_factory (에러 체크)
     workflow.add_conditional_edges(

@@ -1,39 +1,25 @@
-from langchain_openai import OpenAIEmbeddings
-from langchain_qdrant import QdrantVectorStore
-from qdrant_client import AsyncQdrantClient
+"""RAG reason client — Neo4j 버전.
 
-from shared.utils.config import get_settings
+Qdrant 의존성을 제거하고 Neo4j 드라이버를 반환한다.
+generator.py 하위 호환을 위해 get_vector_store 별칭을 유지한다.
+"""
+import logging
 
-_vector_store: QdrantVectorStore | None = None
+from shared.database.neo4j_client import Neo4jClient
 
-
-def get_embeddings() -> OpenAIEmbeddings:
-    settings = get_settings()
-    return OpenAIEmbeddings(
-        model="text-embedding-3-small",
-        api_key=settings.OPENAI_API_KEY,
-    )
+logger = logging.getLogger("faststream")
 
 
-async def get_qdrant_client() -> AsyncQdrantClient:
-    settings = get_settings()
-    return AsyncQdrantClient(
-        url=settings.QDRANT_URL,
-        api_key=settings.QDRANT_API_KEY,
-    )
+async def get_neo4j_driver():
+    """Neo4j 드라이버를 반환한다. 연결 실패 시 None 반환 (graceful fallback)."""
+    try:
+        driver = await Neo4jClient.get_driver()
+        logger.info("[RAG_CLIENT] Neo4j 드라이버 연결 성공")
+        return driver
+    except Exception as exc:
+        logger.warning("[RAG_CLIENT] Neo4j 연결 실패 → fallback: %s", exc)
+        return None
 
 
-async def get_vector_store() -> QdrantVectorStore:
-    """Return a module-level singleton QdrantVectorStore to avoid connection leaks."""
-    global _vector_store
-    if _vector_store is None:
-        settings = get_settings()
-        client = await get_qdrant_client()
-        embeddings = get_embeddings()
-        _vector_store = QdrantVectorStore(
-            client=client,
-            collection_name=settings.QDRANT_COLLECTION_NAME,
-            embedding=embeddings,
-            content_payload_key="review_text",
-        )
-    return _vector_store
+# generator.py가 get_vector_store를 import하므로 별칭 유지
+get_vector_store = get_neo4j_driver
