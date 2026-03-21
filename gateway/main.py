@@ -6,11 +6,18 @@ from faststream.asgi import AsgiFastStream
 
 from shared.utils.logging_config import setup_logging
 from shared.stream.service import KafkaService
+from shared.stream.transactional_publisher import (
+    TransactionalPublisher,
+    get_transactional_publisher,
+    set_transactional_publisher,
+)
+from shared.checkpoint import init_checkpointer, close_checkpointer
 from shared.database.db_manager import DBManager
 from shared.schemas.stream_schema import (
     RecommendationRequestPayload,
     RecommendationRefreshRequestPayload,
     RecommendationResponseData,
+    RecommendationResponsePayload,
     RecommendedItem,
     RestaurantConfirmedPayload,
     UserPersonaUpdatePayload,
@@ -18,6 +25,7 @@ from shared.schemas.stream_schema import (
     RecommendationStreamingData,
     RecommendationStreamingPayload,
     EventType,
+    TopicType,
 )
 from shared.schemas.user_data import UserData
 from shared.schemas.update_persona_db_request import UpdatePersonaDBRequest
@@ -48,12 +56,41 @@ app = AsgiFastStream(
         ("/ai/lightning_request", lightning_request),
     ],
 )
+
+
+@app.on_startup
+async def on_startup() -> None:
+    """앱 시작 시 LangGraph 체크포인터와 트랜잭셔널 프로듀서를 초기화한다."""
+    await init_checkpointer(settings.CHECKPOINT_DB_PATH)
+
+    publisher = TransactionalPublisher(
+        bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS,
+        transactional_id=settings.KAFKA_TRANSACTIONAL_ID,
+        group_id=settings.KAFKA_GROUP_ID,
+    )
+    await publisher.start()
+    set_transactional_publisher(publisher)
+    logger.info("Gateway 초기화 완료: 체크포인터 + 트랜잭셔널 프로듀서")
+
+
+@app.on_shutdown
+async def on_shutdown() -> None:
+    """앱 종료 시 리소스를 정리한다."""
+    publisher = get_transactional_publisher()
+    if publisher:
+        await publisher.stop()
+    await close_checkpointer()
+    logger.info("Gateway 종료 완료")
 #
 
 
 # ── 1. 회식 추천 ─────────────────────────────────────────────────────────────
 @broker.subscriber(
-    service.get_recommendation_request_topic(), group_id=settings.KAFKA_GROUP_ID
+    service.get_recommendation_request_topic(),
+    group_id=settings.KAFKA_GROUP_ID,
+    # no_ack=True: FastStream이 핸들러 반환 후 consumer.commit()을 호출하지 않도록 한다.
+    # 오프셋은 TransactionalPublisher.publish() 내 send_offsets_to_transaction으로 커밋된다.
+    no_ack=True,
 )
 async def handle_recommendation(
     event: RecommendationRequestPayload, logger: Logger, message=Context()
@@ -104,14 +141,35 @@ async def handle_recommendation(
             )
             for r in result.get("final_selection", [])
         ]
-        response_data = RecommendationResponseData(
-            dining_id=dining_id,
-            recommendation_count=current_count,
-            recommended_items=items,
+        response_payload = RecommendationResponsePayload(
+            event_id=event.event_id,
+            event_type=EventType.RECOMMENDATION_RESPONSE.value,
+            payload=RecommendationResponseData(
+                dining_id=dining_id,
+                recommendation_count=current_count,
+                recommended_items=items,
+            ),
         )
-        await service.publish_recommendation_response(
-            event=event, message=message, data=response_data
-        )
+        incoming_headers = list(dict(message.headers).items()) if message.headers else []
+        raw = message.raw_message
+
+        publisher = get_transactional_publisher()
+        if publisher:
+            # exactly-once: 응답 발행 + 컨슈머 오프셋 커밋을 단일 트랜잭션으로 처리
+            await publisher.publish(
+                topic=TopicType.RECOMMENDATION_RESPONSE.value,
+                value=response_payload,
+                key=raw.key,
+                headers=incoming_headers,
+                consumer_topic=raw.topic,
+                consumer_partition=raw.partition,
+                consumer_offset=raw.offset,
+            )
+        else:
+            await service.publish_recommendation_response(
+                event=event, message=message, data=response_payload.payload
+            )
+
         logger.info(
             "recommendation 응답 발행 완료: dining_id=%s, items=%d개",
             dining_id,
@@ -124,7 +182,9 @@ async def handle_recommendation(
 
 # ── 2. 회식 재추천 ───────────────────────────────────────────────────────────
 @broker.subscriber(
-    service.get_recommendation_refresh_request_topic(), group_id=settings.KAFKA_GROUP_ID
+    service.get_recommendation_refresh_request_topic(),
+    group_id=settings.KAFKA_GROUP_ID,
+    no_ack=True,
 )
 async def handle_recommendation_refresh(
     event: RecommendationRefreshRequestPayload, logger: Logger, message=Context()
@@ -153,6 +213,11 @@ async def handle_recommendation_refresh(
         result = await recommendation_task(
             event.payload, correlation_id, "refresh", on_persona_speak=on_persona_speak
         )
+        if result is None:
+            logger.error(
+                "recommendation_task returned None: dining_id=%s", dining_id
+            )
+            return
 
         db = DBManager()
         updated_session = await db.save_dining_session(result)
@@ -165,14 +230,34 @@ async def handle_recommendation_refresh(
             )
             for r in result.get("final_selection", [])
         ]
-        response_data = RecommendationResponseData(
-            dining_id=dining_id,
-            recommendation_count=current_count,
-            recommended_items=items,
+        response_payload = RecommendationResponsePayload(
+            event_id=event.event_id,
+            event_type=EventType.RECOMMENDATION_RESPONSE.value,
+            payload=RecommendationResponseData(
+                dining_id=dining_id,
+                recommendation_count=current_count,
+                recommended_items=items,
+            ),
         )
-        await service.publish_recommendation_response(
-            event=event, message=message, data=response_data
-        )
+        incoming_headers = list(dict(message.headers).items()) if message.headers else []
+        raw = message.raw_message
+
+        publisher = get_transactional_publisher()
+        if publisher:
+            await publisher.publish(
+                topic=TopicType.RECOMMENDATION_RESPONSE.value,
+                value=response_payload,
+                key=raw.key,
+                headers=incoming_headers,
+                consumer_topic=raw.topic,
+                consumer_partition=raw.partition,
+                consumer_offset=raw.offset,
+            )
+        else:
+            await service.publish_recommendation_response(
+                event=event, message=message, data=response_payload.payload
+            )
+
         logger.info(
             "recommendation refresh 응답 발행 완료: dining_id=%s, items=%d개",
             dining_id,

@@ -17,9 +17,6 @@ class EventType(str, Enum):
     RECEIPT_OCR_RESPONSE = "RECEIPT_OCR_RESPONSE"
     PERSONA_REQUEST = "PERSONA_REQUEST"
     PERSONA_RESPONSE = "PERSONA_RESPONSE"
-    # AI 내부 통신
-    DISCUSSION_REQUEST = "DISCUSSION_REQUEST"
-    DISCUSSION_RESPONSE = "DISCUSSION_RESPONSE"
 
 
 class TopicType(str, Enum):
@@ -33,8 +30,6 @@ class TopicType(str, Enum):
     RECEIPT_OCR_RESPONSE = "receipt-ocr-response"
     PERSONA_REQUEST = "persona-request"
     PERSONA_RESPONSE = "persona-response"
-    DISCUSSION_REQUEST = "discussion-request"
-    DISCUSSION_RESPONSE = "discussion-response"
 
 
 PyObjectId = Annotated[
@@ -180,12 +175,6 @@ class DiscussionRequestData(BaseSchema):
     vote_result_list: Optional[list[VoteResultData]] = None
 
 
-class DiscussionRequestPayload(BaseSchema):
-    event_id: int
-    event_type: EventType
-    payload: DiscussionRequestData
-
-
 # AI 회식 응답
 class FinalRestaurant(BaseSchema):
     restaurant_id: str
@@ -198,7 +187,3 @@ class DiscussionResponseData(BaseSchema):
     persona_vote_result_list: list[VoteResultData]
 
 
-class DiscussionResponsePayload(BaseSchema):
-    event_id: int
-    event_type: EventType
-    payload: DiscussionResponseData

@@ -4,6 +4,7 @@ motor
 langchain
 langfuse
 langgraph
+langgraph-checkpoint-sqlite
 langchain-openrouter
 langchain-openai
 langchain-google-genai
