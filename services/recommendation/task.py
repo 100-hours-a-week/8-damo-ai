@@ -4,7 +4,7 @@ import time
 from typing import Callable, Coroutine, Optional, Union
 
 from shared.monitoring import get_langfuse_handler  # env var 주입을 위해 graph보다 먼저 임포트
-from shared.checkpoint import get_checkpointer
+# [EOS] from shared.checkpoint import get_checkpointer
 from shared.schemas.stream_schema import RecommendationRequestData, RecommendationRefreshRequestData
 from services.recommendation.graph import build_pipeline_graph
 
@@ -66,34 +66,30 @@ async def recommendation_task(
 
     t0 = time.monotonic()
     try:
-        checkpointer = get_checkpointer()
-        pipeline = build_pipeline_graph(checkpointer=checkpointer)
+        # [EOS] checkpointer = get_checkpointer()
+        pipeline = build_pipeline_graph()
+        # [EOS] pipeline = build_pipeline_graph(checkpointer=checkpointer)
         handler = get_langfuse_handler()
         config = {
             "run_name": f"{log_type}-pipeline",
             "configurable": {
                 "on_persona_speak": on_persona_speak,
-                # thread_id = dining_id: 프로세스 재시작 시 이 ID로 중단 지점을 복원한다
-                "thread_id": str(dining_id),
+                # [EOS] "thread_id": str(dining_id),  # 체크포인터 재개용
             },
             "callbacks": [handler] if handler else [],
         }
-        # 중단된 체크포인트가 있으면 None을 전달해 해당 지점부터 재개한다.
-        # initial_state를 그대로 넘기면 체크포인트의 필드(filtered_restaurant 등)를
-        # 초기값으로 덮어써 사실상 처음부터 재실행하게 된다.
-        graph_input: dict | None = initial_state
-        if checkpointer is not None:
-            existing = await checkpointer.aget_tuple(config)
-            if existing is not None:
-                logger.info(
-                    "[%s] 중단된 체크포인트 복원 → 이어서 실행: dining_id=%s",
-                    log_type.upper(),
-                    dining_id,
-                )
-                graph_input = None  # 체크포인트 상태를 그대로 사용
+        # [EOS] 체크포인트 감지 및 재개 로직 (EOS 활성화 시 아래 주석 해제):
+        # [EOS] graph_input: dict | None = initial_state
+        # [EOS] if checkpointer is not None:
+        # [EOS]     existing = await checkpointer.aget_tuple(config)
+        # [EOS]     if existing is not None:
+        # [EOS]         logger.info("[%s] 체크포인트 복원 → 이어서 실행: dining_id=%s", log_type.upper(), dining_id)
+        # [EOS]         graph_input = None  # ainvoke(None): 체크포인트 상태를 그대로 사용
+        # [EOS]         # ※ ainvoke(initial_state)를 넘기면 체크포인트 필드(filtered_restaurant 등)를
+        # [EOS]         #   초기값으로 덮어써 처음부터 재실행하게 된다 — 반드시 None을 사용할 것
 
         logger.info("[%s] 그래프 ainvoke 시작", log_type.upper())
-        final_state = await pipeline.ainvoke(graph_input, config=config)
+        final_state = await pipeline.ainvoke(initial_state, config=config)
         logger.info(
             "[%s] 그래프 ainvoke 완료: is_error=%s, filtered_restaurant=%d개, final_selection=%d개",
             log_type.upper(),

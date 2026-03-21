@@ -6,12 +6,12 @@ from faststream.asgi import AsgiFastStream
 
 from shared.utils.logging_config import setup_logging
 from shared.stream.service import KafkaService
-from shared.stream.transactional_publisher import (
-    TransactionalPublisher,
-    get_transactional_publisher,
-    set_transactional_publisher,
-)
-from shared.checkpoint import init_checkpointer, close_checkpointer
+# [EOS] from shared.stream.transactional_publisher import (
+# [EOS]     TransactionalPublisher,
+# [EOS]     get_transactional_publisher,
+# [EOS]     set_transactional_publisher,
+# [EOS] )
+# [EOS] from shared.checkpoint import init_checkpointer, close_checkpointer
 from shared.database.db_manager import DBManager
 from shared.schemas.stream_schema import (
     RecommendationRequestPayload,
@@ -58,39 +58,30 @@ app = AsgiFastStream(
 )
 
 
-@app.on_startup
-async def on_startup() -> None:
-    """앱 시작 시 LangGraph 체크포인터와 트랜잭셔널 프로듀서를 초기화한다."""
-    await init_checkpointer(settings.CHECKPOINT_DB_PATH)
-
-    publisher = TransactionalPublisher(
-        bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS,
-        transactional_id=settings.KAFKA_TRANSACTIONAL_ID,
-        group_id=settings.KAFKA_GROUP_ID,
-    )
-    await publisher.start()
-    set_transactional_publisher(publisher)
-    logger.info("Gateway 초기화 완료: 체크포인터 + 트랜잭셔널 프로듀서")
-
-
-@app.on_shutdown
-async def on_shutdown() -> None:
-    """앱 종료 시 리소스를 정리한다."""
-    publisher = get_transactional_publisher()
-    if publisher:
-        await publisher.stop()
-    await close_checkpointer()
-    logger.info("Gateway 종료 완료")
-#
+# [EOS] @app.on_startup
+# [EOS] async def on_startup() -> None:
+# [EOS]     await init_checkpointer(settings.CHECKPOINT_DB_PATH)
+# [EOS]     publisher = TransactionalPublisher(
+# [EOS]         bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS,
+# [EOS]         transactional_id=settings.KAFKA_TRANSACTIONAL_ID,
+# [EOS]         group_id=settings.KAFKA_GROUP_ID,
+# [EOS]     )
+# [EOS]     await publisher.start()
+# [EOS]     set_transactional_publisher(publisher)
+# [EOS]
+# [EOS] @app.on_shutdown
+# [EOS] async def on_shutdown() -> None:
+# [EOS]     publisher = get_transactional_publisher()
+# [EOS]     if publisher:
+# [EOS]         await publisher.stop()
+# [EOS]     await close_checkpointer()
 
 
 # ── 1. 회식 추천 ─────────────────────────────────────────────────────────────
 @broker.subscriber(
     service.get_recommendation_request_topic(),
     group_id=settings.KAFKA_GROUP_ID,
-    # no_ack=True: FastStream이 핸들러 반환 후 consumer.commit()을 호출하지 않도록 한다.
-    # 오프셋은 TransactionalPublisher.publish() 내 send_offsets_to_transaction으로 커밋된다.
-    no_ack=True,
+    # [EOS] no_ack=True,  # EOS 활성화 시 재설정 필요
 )
 async def handle_recommendation(
     event: RecommendationRequestPayload, logger: Logger, message=Context()
@@ -150,25 +141,23 @@ async def handle_recommendation(
                 recommended_items=items,
             ),
         )
-        incoming_headers = list(dict(message.headers).items()) if message.headers else []
-        raw = message.raw_message
-
-        publisher = get_transactional_publisher()
-        if publisher:
-            # exactly-once: 응답 발행 + 컨슈머 오프셋 커밋을 단일 트랜잭션으로 처리
-            await publisher.publish(
-                topic=TopicType.RECOMMENDATION_RESPONSE.value,
-                value=response_payload,
-                key=raw.key,
-                headers=incoming_headers,
-                consumer_topic=raw.topic,
-                consumer_partition=raw.partition,
-                consumer_offset=raw.offset,
-            )
-        else:
-            await service.publish_recommendation_response(
-                event=event, message=message, data=response_payload.payload
-            )
+        await service.publish_recommendation_response(
+            event=event, message=message, data=response_payload.payload
+        )
+        # [EOS] 아래 블록은 EOS 활성화 시 위 라인을 대체한다:
+        # [EOS] incoming_headers = list(dict(message.headers).items()) if message.headers else []
+        # [EOS] raw = message.raw_message
+        # [EOS] publisher = get_transactional_publisher()
+        # [EOS] if publisher:
+        # [EOS]     await publisher.publish(
+        # [EOS]         topic=TopicType.RECOMMENDATION_RESPONSE.value,
+        # [EOS]         value=response_payload,
+        # [EOS]         key=raw.key,
+        # [EOS]         headers=incoming_headers,
+        # [EOS]         consumer_topic=raw.topic,
+        # [EOS]         consumer_partition=raw.partition,
+        # [EOS]         consumer_offset=raw.offset,
+        # [EOS]     )
 
         logger.info(
             "recommendation 응답 발행 완료: dining_id=%s, items=%d개",
@@ -184,7 +173,7 @@ async def handle_recommendation(
 @broker.subscriber(
     service.get_recommendation_refresh_request_topic(),
     group_id=settings.KAFKA_GROUP_ID,
-    no_ack=True,
+    # [EOS] no_ack=True,  # EOS 활성화 시 재설정 필요
 )
 async def handle_recommendation_refresh(
     event: RecommendationRefreshRequestPayload, logger: Logger, message=Context()
@@ -239,24 +228,23 @@ async def handle_recommendation_refresh(
                 recommended_items=items,
             ),
         )
-        incoming_headers = list(dict(message.headers).items()) if message.headers else []
-        raw = message.raw_message
-
-        publisher = get_transactional_publisher()
-        if publisher:
-            await publisher.publish(
-                topic=TopicType.RECOMMENDATION_RESPONSE.value,
-                value=response_payload,
-                key=raw.key,
-                headers=incoming_headers,
-                consumer_topic=raw.topic,
-                consumer_partition=raw.partition,
-                consumer_offset=raw.offset,
-            )
-        else:
-            await service.publish_recommendation_response(
-                event=event, message=message, data=response_payload.payload
-            )
+        await service.publish_recommendation_response(
+            event=event, message=message, data=response_payload.payload
+        )
+        # [EOS] 아래 블록은 EOS 활성화 시 위 라인을 대체한다:
+        # [EOS] incoming_headers = list(dict(message.headers).items()) if message.headers else []
+        # [EOS] raw = message.raw_message
+        # [EOS] publisher = get_transactional_publisher()
+        # [EOS] if publisher:
+        # [EOS]     await publisher.publish(
+        # [EOS]         topic=TopicType.RECOMMENDATION_RESPONSE.value,
+        # [EOS]         value=response_payload,
+        # [EOS]         key=raw.key,
+        # [EOS]         headers=incoming_headers,
+        # [EOS]         consumer_topic=raw.topic,
+        # [EOS]         consumer_partition=raw.partition,
+        # [EOS]         consumer_offset=raw.offset,
+        # [EOS]     )
 
         logger.info(
             "recommendation refresh 응답 발행 완료: dining_id=%s, items=%d개",
