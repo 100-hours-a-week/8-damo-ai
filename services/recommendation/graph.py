@@ -28,6 +28,9 @@ from services.recommendation.sub_graphs.refresh import (
 # allergy 서브그래프 노드 함수
 from services.recommendation.sub_graphs.allergy import allergy_node
 
+# 카테고리 필터 노드
+from services.recommendation.sub_graphs.meal_category_filter import meal_category_filter_node
+
 from services.recommendation.semantic_rerank_node import semantic_rerank_node
 
 # 브릿지 + 저장 노드
@@ -178,6 +181,9 @@ def build_pipeline_graph(
     workflow.add_node("validate_user_group", is_user_group_valid)
     workflow.add_node("load_remaining_candidates", is_remaining_candidate)
 
+    # 카테고리 필터 노드
+    workflow.add_node("filter_meal_category", meal_category_filter_node)
+
     # 공통 필터링 노드
     workflow.add_node("apply_allergy_penalty", allergy_node)
     workflow.add_node("rerank_by_semantic_score", semantic_rerank_node)
@@ -239,8 +245,9 @@ def build_pipeline_graph(
         },
     )
 
-    # score_by_budget → apply_allergy_penalty
-    workflow.add_edge("score_by_budget", "apply_allergy_penalty")
+    # score_by_budget → filter_meal_category → apply_allergy_penalty
+    workflow.add_edge("score_by_budget", "filter_meal_category")
+    workflow.add_edge("filter_meal_category", "apply_allergy_penalty")
 
     # apply_allergy_penalty → 에러 시 rescue_from_error, 정상 시 rerank_by_semantic_score
     workflow.add_conditional_edges(
