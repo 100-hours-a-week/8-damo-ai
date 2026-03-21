@@ -1,10 +1,10 @@
 """TDD: services/recommendation/graph.py 파이프라인 그래프 연결 테스트.
 
 검증 항목:
-- allergy_sg 노드가 그래프에 등록되어 있는지
-- semantic_rerank 노드가 그래프에 등록되어 있는지
-- recommend → allergy_sg → semantic_rerank → bridge 엣지 순서가 맞는지
-- refresh → allergy_sg 엣지가 존재하는지
+- 주요 노드들이 그래프에 등록되어 있는지
+- score_by_budget → filter_meal_category → apply_allergy_penalty 순서가 맞는지
+- apply_allergy_penalty → rerank_by_semantic_score 엣지가 존재하는지
+- load_remaining_candidates → apply_allergy_penalty 엣지가 존재하는지
 """
 import pytest
 
@@ -21,51 +21,73 @@ def _get_graph_structure():
 
 
 class TestGraphNodes:
-    def test_allergy_sg_node_registered(self):
-        """allergy_sg 노드가 그래프에 등록되어 있는지."""
+    def test_filter_meal_category_node_registered(self):
+        """filter_meal_category 노드가 그래프에 등록되어 있는지."""
         nodes, _ = _get_graph_structure()
-        assert "allergy_sg" in nodes
+        assert "filter_meal_category" in nodes
 
-    def test_semantic_rerank_node_registered(self):
-        """semantic_rerank 노드가 그래프에 등록되어 있는지."""
+    def test_apply_allergy_penalty_node_registered(self):
+        """apply_allergy_penalty 노드가 그래프에 등록되어 있는지."""
         nodes, _ = _get_graph_structure()
-        assert "semantic_rerank" in nodes
+        assert "apply_allergy_penalty" in nodes
+
+    def test_rerank_by_semantic_score_node_registered(self):
+        """rerank_by_semantic_score 노드가 그래프에 등록되어 있는지."""
+        nodes, _ = _get_graph_structure()
+        assert "rerank_by_semantic_score" in nodes
 
     def test_existing_nodes_still_present(self):
         """기존 노드들이 유지되는지 (회귀 테스트)."""
         nodes, _ = _get_graph_structure()
-        for node in ["recommend", "refresh", "bridge", "persona_factory",
-                     "moderator_preselect", "restaurant_dialogue", "score_fallback"]:
-            assert node in nodes, f"기존 노드 '{node}'가 사라짐"
+        expected = [
+            "fetch_nearby_restaurants",
+            "score_by_budget",
+            "filter_meal_category",
+            "apply_allergy_penalty",
+            "rerank_by_semantic_score",
+            "initialize_dialogue_state",
+            "create_group_personas",
+            "select_candidate_batch",
+            "run_persona_discussion",
+            "apply_dialogue_fallback",
+            "persist_voting_records",
+            "persist_dialogue_history",
+            "generate_recommendation_reasons",
+            "validate_user_group",
+            "load_remaining_candidates",
+            "rescue_from_error",
+        ]
+        for node in expected:
+            assert node in nodes, f"노드 '{node}'가 그래프에 없음"
 
 
 class TestGraphEdges:
-    def test_recommend_to_allergy_sg(self):
-        """recommend → allergy_sg 엣지가 존재하는지."""
+    def test_score_by_budget_to_filter_meal_category(self):
+        """score_by_budget → filter_meal_category 엣지가 존재하는지."""
         _, edges = _get_graph_structure()
-        assert ("recommend", "allergy_sg") in edges
+        assert ("score_by_budget", "filter_meal_category") in edges
 
-    def test_refresh_to_allergy_sg(self):
-        """refresh → allergy_sg 엣지가 존재하는지."""
+    def test_filter_meal_category_to_apply_allergy_penalty(self):
+        """filter_meal_category → apply_allergy_penalty 엣지가 존재하는지."""
         _, edges = _get_graph_structure()
-        assert ("refresh", "allergy_sg") in edges
+        assert ("filter_meal_category", "apply_allergy_penalty") in edges
 
-    def test_allergy_sg_to_semantic_rerank(self):
-        """allergy_sg → semantic_rerank 엣지가 존재하는지 (에러 없을 때)."""
+    def test_score_by_budget_does_not_go_directly_to_allergy(self):
+        """score_by_budget이 더 이상 apply_allergy_penalty로 직접 연결되지 않는지."""
         _, edges = _get_graph_structure()
-        assert ("allergy_sg", "semantic_rerank") in edges
+        assert ("score_by_budget", "apply_allergy_penalty") not in edges
 
-    def test_semantic_rerank_to_bridge(self):
-        """semantic_rerank → bridge 엣지가 존재하는지 (에러 없을 때)."""
+    def test_apply_allergy_penalty_to_rerank(self):
+        """apply_allergy_penalty → rerank_by_semantic_score 엣지가 존재하는지 (에러 없을 때)."""
         _, edges = _get_graph_structure()
-        assert ("semantic_rerank", "bridge") in edges
+        assert ("apply_allergy_penalty", "rerank_by_semantic_score") in edges
 
-    def test_recommend_does_not_go_directly_to_bridge(self):
-        """recommend가 더 이상 bridge로 직접 연결되지 않는지."""
+    def test_rerank_to_initialize_dialogue_state(self):
+        """rerank_by_semantic_score → initialize_dialogue_state 엣지가 존재하는지."""
         _, edges = _get_graph_structure()
-        assert ("recommend", "bridge") not in edges
+        assert ("rerank_by_semantic_score", "initialize_dialogue_state") in edges
 
-    def test_refresh_does_not_go_directly_to_bridge(self):
-        """refresh가 더 이상 bridge로 직접 연결되지 않는지."""
+    def test_load_remaining_to_allergy(self):
+        """load_remaining_candidates → apply_allergy_penalty 엣지가 존재하는지."""
         _, edges = _get_graph_structure()
-        assert ("refresh", "bridge") not in edges
+        assert ("load_remaining_candidates", "apply_allergy_penalty") in edges
