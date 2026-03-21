@@ -65,6 +65,11 @@ Thumbs.db
 docs/
 
 # ======================
+# Local tools (not for git)
+# ======================
+tools/
+
+# ======================
 # etc
 # ======================
 services/iterative_discussion/eval/

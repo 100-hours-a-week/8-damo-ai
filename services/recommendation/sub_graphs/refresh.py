@@ -1,7 +1,6 @@
 import logging
 
 from langgraph.graph import StateGraph, START, END
-from langgraph.types import Command
 from services.recommendation.state import RecommendationState
 from shared.database.db_manager import DBManager
 
@@ -16,27 +15,30 @@ async def is_user_group_valid(state: RecommendationState) -> RecommendationState
     dining_session = await db_manager.read_one({"diningId": int(dining_id)})
     if dining_session is None:
         logger.warning("[REFRESH] dining_session 없음 → END: dining_id=%s", dining_id)
-        return Command(update={
+        return {
+            "is_error": True,
             "error_message": f"Dining session not found: {dining_id}",
-            "status_message": f"회식 세션(ID: {dining_id}) 정보를 찾을 수 없어 추천을 중단합니다."
-        }, goto=END)
-    
+            "status_message": f"회식 세션(ID: {dining_id}) 정보를 찾을 수 없어 추천을 중단합니다.",
+        }
+
     current_user_ids = state.get("user_ids")
     prev_user_ids = dining_session.get("userIds")
 
     if set(current_user_ids) == set(prev_user_ids):
         logger.info("[REFRESH] 동일 유저 그룹, DB 후보 확인: dining_id=%s", dining_id)
-        return Command(update={
+        return {
+            "is_group_changed": False,
             "iteration_count": dining_session.get("currentPhase", 0),
             "error_message": f"User ids are same: {dining_id}",
-            "status_message": f"회식 세션(ID: {dining_id})에 참여한 유저가 변경되지 않았습니다."
-        }, goto="is_remaining_candidate")
+            "status_message": f"회식 세션(ID: {dining_id})에 참여한 유저가 변경되지 않았습니다.",
+        }
     else:
         logger.info("[REFRESH] 유저 그룹 변경, AI 신규 추천으로: dining_id=%s", dining_id)
-        return Command(update={
+        return {
+            "is_group_changed": True,
             "error_message": f"User ids are different: {dining_id}",
-            "status_message": f"회식 세션(ID: {dining_id})에 참여한 유저가 변경되었습니다."
-        }, goto="recommend", graph=Command.PARENT)
+            "status_message": f"회식 세션(ID: {dining_id})에 참여한 유저가 변경되었습니다.",
+        }
 
 async def is_remaining_candidate(state: RecommendationState) -> RecommendationState:
     dining_id = int(state.get("dining_id"))
@@ -87,12 +89,13 @@ async def is_remaining_candidate(state: RecommendationState) -> RecommendationSt
         }
 
     except Exception as e:
-        # 후보가 하나도 없거나 에러 발생 시 부모의 recommend(AI 연산) 노드로 이동
+        # 후보가 하나도 없거나 에러 발생 시 fetch_nearby_restaurants(AI 연산) 노드로 이동
         logger.info("[REFRESH] DB 후보 소진, AI 신규 추천으로 전환: dining_id=%s, reason=%s", dining_id, e)
-        return Command(update={
+        return {
+            "no_db_candidates": True,
             "error_message": f"No candidate restaurants found: {dining_id}",
-            "status_message": "보여드릴 남은 후보가 없어 AI 신규 추천을 시작합니다."
-        }, goto="recommend", graph=Command.PARENT)
+            "status_message": "보여드릴 남은 후보가 없어 AI 신규 추천을 시작합니다.",
+        }
 
 # 메인 그래프
 def get_refresh_graph():

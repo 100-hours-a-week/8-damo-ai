@@ -203,9 +203,8 @@ class TestAllergyNode:
 
             result = await allergy_node(state)
 
-        # Command 또는 dict 형태 모두 허용
-        update = result.update if hasattr(result, "update") else result
-        assert "filtered_restaurant" in update
+        assert isinstance(result, dict)
+        assert "filtered_restaurant" in result
 
     @pytest.mark.asyncio
     async def test_penalty_zero_for_users_with_no_allergies(self):
@@ -221,7 +220,7 @@ class TestAllergyNode:
 
         async def mock_read_one(query):
             for uid, user in mock_users.items():
-                if str(uid) in str(query):
+                if uid in query.get("id", {}).get("$in", []):
                     return user
             return None
 
@@ -234,8 +233,7 @@ class TestAllergyNode:
 
             result = await allergy_node(state)
 
-        update = result.update if hasattr(result, "update") else result
-        for r in update.get("filtered_restaurant", []):
+        for r in result.get("filtered_restaurant", []):
             assert r.get("allergy_penalty", 0.0) == 0.0
 
     @pytest.mark.asyncio
@@ -258,8 +256,7 @@ class TestAllergyNode:
 
             result = await allergy_node(state)
 
-        update = result.update if hasattr(result, "update") else result
-        restaurants = update.get("filtered_restaurant", [])
+        restaurants = result.get("filtered_restaurant", [])
         assert len(restaurants) > 0
         assert "allergy_hints" in restaurants[0]
 
@@ -284,7 +281,7 @@ class TestAllergyNode:
 
         async def mock_read_one(query):
             for uid, user in mock_users.items():
-                if str(uid) in str(query):
+                if uid in query.get("id", {}).get("$in", []):
                     return user
             return None
 
@@ -297,15 +294,12 @@ class TestAllergyNode:
 
             result = await allergy_node(state)
 
-        update = result.update if hasattr(result, "update") else result
-        filtered = update.get("filtered_restaurant", [])
-        assert len(filtered) == 0
+        assert len(result.get("filtered_restaurant", [])) == 0
 
     @pytest.mark.asyncio
-    async def test_goto_end_on_success(self):
-        """정상 완료 시 Command의 goto가 END로 설정되는지."""
+    async def test_returns_dict_on_success(self):
+        """정상 완료 시 dict를 반환하는지."""
         from services.recommendation.sub_graphs.allergy import allergy_node
-        from langgraph.graph import END
 
         state = self._make_state()
 
@@ -318,8 +312,8 @@ class TestAllergyNode:
 
             result = await allergy_node(state)
 
-        assert hasattr(result, "goto")
-        assert result.goto == END
+        assert isinstance(result, dict)
+        assert "filtered_restaurant" in result
 
 
 # ─── get_allergy_graph ────────────────────────────────────────────────────────

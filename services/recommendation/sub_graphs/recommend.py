@@ -55,13 +55,45 @@ async def distance_node(state: RecommendationState) -> RecommendationState:
     restaurants = await db_manager.find_by_location(_X, _Y, MAX_DISTANCE)
     logger.info("[DISTANCE] 조회 결과: %d개", len(restaurants) if restaurants else 0)
 
+    # 2. 리프레시 시 이전에 추천한 식당 제외
+    if not state.get("is_initial_workflow", True):
+        excluded_ids: set[str] = set()
+
+        # DB의 rejectedCandidate (이전 phase에서 보여준 식당 전체)
+        try:
+            session_db = DBManager()
+            session_db.set_collection("dining_sessions")
+            session = await session_db.read_one({"diningId": int(dining_id)})
+            if session:
+                for r in session.get("rejectedCandidate", []):
+                    excluded_ids.add(str(r.get("_id", "")))
+                for r in session.get("restaurantCandidate", []):
+                    excluded_ids.add(str(r.get("_id", "")))
+        except Exception as e:
+            logger.warning("[DISTANCE] 이전 추천 식당 조회 실패 (무시): %s", e)
+
+        # vote_result_list (현재 배치: 방금 거절된 식당)
+        for v in state.get("vote_result_list", []):
+            rid = v.get("restaurant_id") if isinstance(v, dict) else getattr(v, "restaurant_id", "")
+            if rid:
+                excluded_ids.add(str(rid))
+
+        before = len(restaurants)
+        restaurants = [r for r in restaurants if str(r.get("_id", "")) not in excluded_ids]
+        logger.info(
+            "[DISTANCE] 리프레시 중복 제거: %d개 제외 → %d개 남음",
+            before - len(restaurants),
+            len(restaurants),
+        )
+
     if not restaurants or len(restaurants) == 0:
         logger.warning("[DISTANCE] 반경 내 식당 없음 → END: dining_id=%s", dining_id)
-        return Command(update={
+        return {
+            "is_error": True,
             "filtered_restaurant": [],
             "status_message": "필터링된 식당이 없습니다",
-            "error_message": f"No Restaurant from the location ({_X}, {_Y})"
-        }, goto=END)
+            "error_message": f"No Restaurant from the location ({_X}, {_Y})",
+        }
 
     # 2. 거리 점수 계산 (1.0 ~ 0.0)
     import math
@@ -85,10 +117,10 @@ async def distance_node(state: RecommendationState) -> RecommendationState:
     # 3. 점수 기반 정렬 (내림차순: 점수 높은/가까운 식당 우선)
     restaurants.sort(key=lambda x: x["distance_score"], reverse=True)
 
-    return Command(update={
+    return {
         "filtered_restaurant": restaurants,
-        "status_message": f"거리 필터링 완료: {len(restaurants)}개 검색됨 (가까운 순 정렬)"
-    }, goto="budget")
+        "status_message": f"거리 필터링 완료: {len(restaurants)}개 검색됨 (가까운 순 정렬)",
+    }
 
 def _scoring_allergy(user_datas: list[dict], filtered_restaurant: list[dict]) -> list[dict]:
     def _calculate_dynamic_score(menus: list[dict], allergy: str) -> float:

@@ -9,7 +9,6 @@ recommend.py의 기존 allergy_node/ALLERGY_KEYWORDS는 수정하지 않음.
 import logging
 
 from langgraph.graph import StateGraph, START, END
-from langgraph.types import Command
 
 from services.recommendation.state import RecommendationState
 from shared.database.db_manager import DBManager
@@ -154,7 +153,7 @@ def _is_hard_exclude(user_datas: list[dict], restaurant: dict) -> bool:
 
 # ─── 알러지 노드 ──────────────────────────────────────────────────────────────
 
-async def allergy_node(state: RecommendationState) -> Command:
+async def allergy_node(state: RecommendationState) -> dict:
     """알러지 소프트 패널티 계산 노드.
 
     - 유저 DB 조회 → 알러지 목록 수집
@@ -172,15 +171,13 @@ async def allergy_node(state: RecommendationState) -> Command:
     for uid in user_ids:
         user = await db.read_one({"id": {"$in": [str(uid), int(uid)]}})
         if user is None:
-            logger.warning("[ALLERGY] 유저 없음 → END: user_id=%s", uid)
-            return Command(
-                update={
-                    "filtered_restaurant": [],
-                    "error_message": f"User not found in DB: {uid}",
-                    "status_message": f"유저(ID: {uid}) 정보를 찾을 수 없어 추천을 중단합니다.",
-                },
-                goto=END,
-            )
+            logger.warning("[ALLERGY] 유저 없음 → 구제 경로: user_id=%s", uid)
+            return {
+                "is_error": True,
+                "error_message": f"User not found in DB: {uid}",
+                "status_message": f"유저(ID: {uid}) 정보를 찾을 수 없어 알러지 필터링을 건너뜁니다.",
+                # filtered_restaurant 유지 — rescue_from_error가 점수 기반 추천에 사용
+            }
         user_datas.append(user)
 
     filtered = state.get("filtered_restaurant", [])
@@ -201,13 +198,10 @@ async def allergy_node(state: RecommendationState) -> Command:
 
     logger.info("[ALLERGY] 완료: %d/%d 식당 생존", len(result), len(filtered))
 
-    return Command(
-        update={
-            "filtered_restaurant": result,
-            "status_message": f"알러지 필터링 완료: {len(result)}개 생존",
-        },
-        goto=END,
-    )
+    return {
+        "filtered_restaurant": result,
+        "status_message": f"알러지 필터링 완료: {len(result)}개 생존",
+    }
 
 
 # ─── 서브그래프 팩토리 ────────────────────────────────────────────────────────
