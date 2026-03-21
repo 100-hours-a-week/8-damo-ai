@@ -8,8 +8,10 @@
         → END
 """
 import logging
+from typing import Optional
 
 from langchain_core.runnables import Runnable
+from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import StateGraph, START, END
 
 # 서브그래프
@@ -82,8 +84,15 @@ def _after_restaurant_dialogue(state: PipelineState) -> str:
 
 # ── 그래프 빌더 ───────────────────────────────────────────────────────────────
 
-def build_pipeline_graph() -> Runnable:
-    """통합 파이프라인 그래프를 빌드하고 컴파일된 그래프를 반환."""
+def build_pipeline_graph(
+    checkpointer: Optional[BaseCheckpointSaver] = None,
+) -> Runnable:
+    """통합 파이프라인 그래프를 빌드하고 컴파일된 그래프를 반환.
+
+    Args:
+        checkpointer: LangGraph 체크포인터. 설정 시 노드 실행마다 상태를 저장하며
+                      프로세스 재시작 시 thread_id(=dining_id)를 기준으로 중단 지점부터 재개한다.
+    """
     workflow = StateGraph(PipelineState)
 
     # 서브그래프 노드 등록
@@ -167,4 +176,4 @@ def build_pipeline_graph() -> Runnable:
     workflow.add_edge("save_dialogue_node", "rag_reason_node")
     workflow.add_edge("rag_reason_node", END)
 
-    return workflow.compile()
+    return workflow.compile(checkpointer=checkpointer)

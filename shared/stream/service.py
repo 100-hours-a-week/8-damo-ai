@@ -56,6 +56,12 @@ class KafkaService:
             middlewares=[self.middleware],
             parser=safe_header_parser,
             client_id=self.settings.KAFKA_CLIENT_ID,
+            # exactly-once를 위한 컨슈머 설정:
+            # - enable_auto_commit=False: aiokafka 주기적 자동 커밋 비활성화
+            # - isolation_level=read_committed: 트랜잭션 롤백된 메시지를 읽지 않음
+            # 오프셋 커밋은 TransactionalPublisher.publish()의 send_offsets_to_transaction으로 처리
+            enable_auto_commit=False,
+            isolation_level="read_committed",
         )
         self._recommendation_response_publisher = self.broker.publisher(
             TopicType.RECOMMENDATION_RESPONSE.value

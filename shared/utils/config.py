@@ -30,6 +30,11 @@ class Settings(BaseSettings):
     KAFKA_GROUP_ID: str = "damo-ai-dev"
     KAFKA_CLIENT_ID: str = "damo-ai-dev-gateway-client"
     KAFKA_AUTO_OFFSET_RESET: str = "earliest"
+    # Transactional Producer (exactly-once)
+    KAFKA_TRANSACTIONAL_ID: str = "damo-ai-recommendation-producer"
+
+    # LangGraph 체크포인터
+    CHECKPOINT_DB_PATH: str = "checkpoints.db"
 
     NEO4J_URI: str = ""
     NEO4J_USERNAME: str = "neo4j"

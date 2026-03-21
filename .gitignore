@@ -106,3 +106,7 @@ scripts/run_lightning_eval.py
 scripts/test_e2e_neo4j.py
 services/core_service/modules/lightning/label_lightning.py
 PLAN_PIPELINE_UNIFICATION.md
+scripts/indexing/kakao_review_to_neo4j.py
+scripts/indexing/reviews_json_to_neo4j.py
+reviews.json
+scripts/verify_review_embeddings.py
