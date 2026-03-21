@@ -97,6 +97,8 @@ async def retrieve_reviews(
 
         docs = [Document(page_content=r["rev.review_text"]) for r in records]
         logger.info("[RETRIEVER] 리뷰 검색 완료: restaurant_id=%s, 결과=%d건", restaurant_id, len(docs))
+        for idx, doc in enumerate(docs):
+            logger.debug("[RETRIEVER] 리뷰[%d]: %s", idx, doc.page_content[:100])
         return docs
 
     except Exception as exc:

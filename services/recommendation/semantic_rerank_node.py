@@ -101,6 +101,13 @@ async def semantic_rerank_node(state: dict[str, Any]) -> dict[str, Any]:
         restaurant_ids = [str(r["_id"]) for r in filtered]
         semantic_scores = await _fetch_semantic_scores(embedding, restaurant_ids)
         logger.info("[SEMANTIC] Neo4j 유사도 조회 완료: hit=%d/%d개", len(semantic_scores), len(restaurant_ids))
+        if semantic_scores:
+            score_detail = ", ".join(
+                f"{r.get('place_name', rid)[:10]}={semantic_scores[rid]:.4f}"
+                for r in filtered
+                if (rid := str(r["_id"])) in semantic_scores
+            )
+            logger.info("[SEMANTIC] 식당별 유사도 점수: %s", score_detail)
     except Exception as exc:
         logger.warning("[SEMANTIC] Neo4j 오류 또는 Review 미구축 → total_score 기준 정렬로 fallback: %s", exc)
         return {
@@ -122,8 +129,9 @@ async def semantic_rerank_node(state: dict[str, Any]) -> dict[str, Any]:
         )
 
     reranked = sorted(filtered, key=lambda r: r["final_score"], reverse=True)
-    logger.info("[SEMANTIC] 재정렬 완료: %d개, 상위 식당=%s (final_score=%.4f)",
-                len(reranked),
-                reranked[0].get("place_name", "unknown") if reranked else "없음",
-                reranked[0].get("final_score", 0.0) if reranked else 0.0)
+    ranking_detail = ", ".join(
+        f"{i+1}.{r.get('place_name', '?')[:8]}(total={r.get('total_score', 0):.3f}, sem={r.get('semantic_score', 0):.3f}, final={r['final_score']:.3f})"
+        for i, r in enumerate(reranked[:5])
+    )
+    logger.info("[SEMANTIC] 재정렬 완료: %d개 | 상위5: %s", len(reranked), ranking_detail)
     return {"filtered_restaurant": reranked}

@@ -176,8 +176,8 @@ class DBManager:
 
                 # 거절된 식당이 있으면 push ($each 사용으로 리스트 병합)
                 if rejected_candidates:
-                    update_query["$push"]["rejectedCandidate"] = {
-                        "$each": rejected_candidates
+                    update_query["$push"] = {
+                        "rejectedCandidate": {"$each": rejected_candidates}
                     }
 
                 await self.collection.update_one({"diningId": dining_id}, update_query)

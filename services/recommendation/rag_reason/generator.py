@@ -64,6 +64,12 @@ async def generate_reason_for_restaurant(
         )
         place_name = restaurant.get("place_name") or restaurant.get("name", "")
         category_detail = restaurant.get("category_detail", "")
+        logger.info(
+            "[RAG_GEN] 식당 정보 로드: id=%s, name=%s, category=%s, menus=%s, reviews=%d건",
+            restaurant_id, place_name, category_detail, top_menus, len(reviews),
+        )
+        for idx, doc in enumerate(reviews):
+            logger.debug("[RAG_GEN] 리뷰[%d] 사용: %s", idx, doc.page_content[:100])
     else:
         review_excerpts = "리뷰 정보가 없습니다."
         top_menus = "정보 없음"

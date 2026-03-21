@@ -70,6 +70,10 @@ class PipelineState(TypedDict):
     is_error: bool
     error_message: Optional[str]
 
+    # ── 라우팅 플래그 ──────────────────────────────────────────────────────
+    is_group_changed: bool       # validate_user_group: 유저 그룹 변경 여부
+    no_db_candidates: bool       # load_remaining_candidates: DB 후보 소진 여부
+
 
 # 서브그래프(recommend_sg, refresh_sg) 호환 별칭
 RecommendationState = PipelineState
