@@ -9,10 +9,6 @@ from shared.schemas.stream_schema import (
     RecommendationResponseData,
     RecommendationResponsePayload,
     RecommendationStreamingPayload,
-    DiscussionRequestPayload,
-    DiscussionRequestData,
-    DiscussionResponseData,
-    DiscussionResponsePayload,
     RecommendationStreamingData,
     EventType,
     TopicType,
@@ -69,12 +65,6 @@ class KafkaService:
         self._recommendation_streaming_publisher = self.broker.publisher(
             TopicType.RECOMMENDATION_STREAMING.value
         )
-        self._discussion_request_publisher = self.broker.publisher(
-            TopicType.DISCUSSION_REQUEST.value
-        )
-        self._discussion_response_publisher = self.broker.publisher(
-            TopicType.DISCUSSION_RESPONSE.value
-        )
         self.error_handler()
 
     async def publish_recommendation_response(
@@ -109,44 +99,9 @@ class KafkaService:
             f"Service: Published recommendation streaming for key {data.payload.dining_id}-{data.payload.user_id}"
         )
 
-    async def publish_ai_discussion_request(
-        self, event_id: int, key: bytes, headers: dict, data: DiscussionRequestData
-    ):
-        incoming_headers = headers if headers else {}
-        display_key = key.decode("utf-8", errors="ignore") if key else "None"
-
-        payload = DiscussionRequestPayload(
-            event_id=event_id,
-            event_type=EventType.DISCUSSION_REQUEST.value,
-            payload=data,
-        )
-
-        await self._discussion_request_publisher.publish(
-            headers=incoming_headers, message=payload, key=key
-        )
-        print(
-            f"Service: Published discussion request for key {display_key} - Event ID: {event_id}"
-        )
-
     # 이벤트 타입 수정 필요
     async def publish_receipt_ocr_response(self, event, message: KafkaMessage):
         pass
-
-    async def publish_ai_discussion_response(
-        self,
-        event_id: int,
-        key: bytes,
-        data: DiscussionResponseData,
-    ):
-        payload = DiscussionResponsePayload(
-            event_id=event_id,
-            event_type=EventType.DISCUSSION_RESPONSE.value,
-            payload=data,
-        )
-        await self._discussion_response_publisher.publish(message=payload, key=key)
-        print(
-            f"Service: Published discussion response for key {key.decode('utf-8') if key else 'None'}"
-        )
 
     # 에러 핸들러(아마 사용안할듯)
     def error_handler(self):
@@ -185,8 +140,3 @@ class KafkaService:
     def get_receipt_ocr_request_topic(self):
         return TopicType.RECEIPT_OCR_REQUEST.value
 
-    def get_ai_discussion_response_topic(self):
-        return TopicType.DISCUSSION_RESPONSE.value
-
-    def get_ai_discussion_request_topic(self):
-        return TopicType.DISCUSSION_REQUEST.value
