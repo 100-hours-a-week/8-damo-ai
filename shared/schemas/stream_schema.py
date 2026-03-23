@@ -146,7 +146,7 @@ class RestaurantConfirmedPayload(BaseSchema):
 
 # 영수증 OCR 요청/응답 페이로드
 class ReceiptOCRRequestData(BaseSchema):
-    image_url: Optional[str] = None
+    receipt_url: Optional[str] = None
     image_base64: Optional[str] = None
 
 
