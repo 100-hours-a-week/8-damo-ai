@@ -3,9 +3,12 @@
 TestKafkaBroker 대신 핸들러를 직접 호출해 mock으로 검증한다.
 노드 단위 로직은 test/services/recommendation/에서 별도 테스트.
 """
+import asyncio
 import pytest
 from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock, patch, call
+
+import gateway.main as gw_main
 
 
 def _make_dining_data_dict(**kwargs) -> dict:
@@ -42,6 +45,21 @@ def _make_final_selection() -> list:
     ]
 
 
+async def _drain_tasks() -> None:
+    """핸들러가 생성한 백그라운드 태스크가 완료될 때까지 대기."""
+    tasks = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
+    if tasks:
+        await asyncio.gather(*tasks, return_exceptions=True)
+
+
+@pytest.fixture(autouse=True)
+def init_semaphore():
+    """테스트마다 세마포어 초기화 (on_startup 대체)."""
+    gw_main._recommendation_semaphore = asyncio.Semaphore(3)
+    yield
+    gw_main._recommendation_semaphore = None
+
+
 @pytest.fixture(autouse=True)
 def mock_service():
     """KafkaService 전체를 mock — 모듈 임포트 시 Kafka 연결 방지."""
@@ -76,6 +94,7 @@ class TestHandleRecommendation:
             mock_message.correlation_id = "test-cid"
 
             await handle_recommendation(event, mock_logger, mock_message)
+            await _drain_tasks()
 
         mock_task.assert_called_once()
         _, kwargs = mock_task.call_args
@@ -103,6 +122,7 @@ class TestHandleRecommendation:
             mock_message = _make_message()
 
             await handle_recommendation(event, mock_logger, mock_message)
+            await _drain_tasks()
 
         mock_service.publish_recommendation_response.assert_called_once()
 
@@ -127,6 +147,7 @@ class TestHandleRecommendation:
             from gateway.main import handle_recommendation
             event = _make_event()
             await handle_recommendation(event, MagicMock(), _make_message())
+            await _drain_tasks()
 
         assert captured_callback is not None
         # 콜백 실제 호출
@@ -154,6 +175,7 @@ class TestHandleRecommendationRefresh:
             mock_message = _make_message()
 
             await handle_recommendation_refresh(event, MagicMock(), mock_message)
+            await _drain_tasks()
 
         mock_task.assert_called_once()
         args, kwargs = mock_task.call_args
