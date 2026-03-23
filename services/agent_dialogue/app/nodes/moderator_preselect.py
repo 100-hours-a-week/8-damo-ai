@@ -1,7 +1,9 @@
+import inspect
 import logging
 from typing import Any, Dict, List
 
 from bson import ObjectId
+from langchain_core.runnables import RunnableConfig
 from langfuse import observe
 
 from shared.database.db_manager import DBManager
@@ -10,15 +12,29 @@ from services.agent_dialogue.app.utils.scoring import rank_restaurants
 
 logger = logging.getLogger(__name__)
 
+
+async def _emit_status(config: RunnableConfig, dining_id: Any, content: str) -> None:
+    configurable = (config or {}).get("configurable") or {}
+    on_speak = configurable.get("on_persona_speak")
+    if not on_speak:
+        return
+    result = on_speak({"user_id": 0, "dining_id": str(dining_id), "content": content})
+    if inspect.isawaitable(result):
+        await result
+
 _BATCH_SIZE = 5
 
 
 @observe(name="moderator_preselect")
-async def moderator_preselect(state: AgentDialogueState) -> dict:
+async def moderator_preselect(state: AgentDialogueState, config: RunnableConfig = None) -> dict:
     """Node 2: filtered_restaurant_ids에서 배치 5개를 DB 조회 → score 정렬."""
     all_ids = state.get("filtered_restaurant_ids", [])
     user_data_list = state.get("user_data_list", [])
     offset = state.get("restaurant_offset", 0)
+
+    if offset == 0:
+        dining_id = state.get("dining_data", {}).get("dining_id") or state.get("dining_id", 0)
+        await _emit_status(config, dining_id, "식당 토론을 준비하고 있어요")
 
     logger.info(
         "[Node2] moderator_preselect 시작: 전체=%d개, offset=%d",
