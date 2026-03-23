@@ -115,3 +115,7 @@ scripts/indexing/kakao_review_to_neo4j.py
 scripts/indexing/reviews_json_to_neo4j.py
 reviews.json
 scripts/verify_review_embeddings.py
+golden.csv
+golden_data.csv
+ocr_code/
+scripts/indexing/menus_to_neo4j.py
