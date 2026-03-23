@@ -10,6 +10,9 @@ from shared.schemas.stream_schema import (
     RecommendationResponsePayload,
     RecommendationStreamingPayload,
     RecommendationStreamingData,
+    ReceiptOCRRequestPayload,
+    ReceiptOCRResponseData,
+    ReceiptOCRResponsePayload,
     EventType,
     TopicType,
 )
@@ -59,6 +62,9 @@ class KafkaService:
         self._recommendation_streaming_publisher = self.broker.publisher(
             TopicType.RECOMMENDATION_STREAMING.value
         )
+        self._receipt_ocr_response_publisher = self.broker.publisher(
+            TopicType.RECEIPT_OCR_RESPONSE.value
+        )
         self.error_handler()
 
     async def publish_recommendation_response(
@@ -93,9 +99,25 @@ class KafkaService:
             f"Service: Published recommendation streaming for key {data.payload.dining_id}-{data.payload.user_id}"
         )
 
-    # 이벤트 타입 수정 필요
-    async def publish_receipt_ocr_response(self, event, message: KafkaMessage):
-        pass
+    async def publish_receipt_ocr_response(
+        self,
+        event: ReceiptOCRRequestPayload,
+        message: KafkaMessage,
+        data: ReceiptOCRResponseData,
+    ):
+        resp_data = ReceiptOCRResponsePayload(
+            event_id=event.event_id,
+            event_type=EventType.RECEIPT_OCR_RESPONSE.value,
+            payload=data,
+        )
+        incoming_headers = dict(message.headers) if message.headers else {}
+        await self._receipt_ocr_response_publisher.publish(
+            headers=incoming_headers, message=resp_data, key=message.raw_message.key
+        )
+        print(
+            f"Service: Published receipt OCR response for key "
+            f"{message.raw_message.key.decode('utf-8') if message.raw_message.key else 'None'}"
+        )
 
     # 에러 핸들러(아마 사용안할듯)
     def error_handler(self):

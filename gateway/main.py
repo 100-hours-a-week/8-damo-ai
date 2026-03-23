@@ -22,6 +22,7 @@ from shared.schemas.stream_schema import (
     RestaurantConfirmedPayload,
     UserPersonaUpdatePayload,
     ReceiptOCRRequestPayload,
+    ReceiptOCRResponseData,
     RecommendationStreamingData,
     RecommendationStreamingPayload,
     EventType,
@@ -316,8 +317,25 @@ async def handle_receipt_ocr(
         google_service = GoogleVisionService()
         logger.debug("google vision client: %s", await google_service.check_client())
 
-        # TODO: OCR 처리 및 응답 발행 미구현
-        # await service.publish_receipt_ocr_response(payload, message)
+        if payload.image_url:
+            result = await google_service.extract_text_from_url(payload.image_url)
+        elif payload.image_base64:
+            result = await google_service.extract_text_from_base64(payload.image_base64)
+        else:
+            logger.error("handle_receipt_ocr: image_url과 image_base64 모두 없음")
+            return
+
+        if not result["success"]:
+            logger.error("OCR 처리 실패: %s", result["error"])
+            return
+
+        response_data = ReceiptOCRResponseData(
+            full_text=result["full_text"],
+            process_time=result["process_time"],
+        )
+        await service.publish_receipt_ocr_response(
+            event=event, message=message, data=response_data
+        )
     except Exception:
         logger.exception("handle_receipt_ocr 오류")
         raise
