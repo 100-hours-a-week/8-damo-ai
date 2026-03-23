@@ -15,6 +15,7 @@ faststream[cli]
 uvicorn
 boto3
 google-cloud-vision
+aiohttp
 neo4j
 google-cloud-bigquery
 google-cloud-bigquery-storage
