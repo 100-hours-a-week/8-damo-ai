@@ -317,8 +317,8 @@ async def handle_receipt_ocr(
         google_service = GoogleVisionService()
         logger.debug("google vision client: %s", await google_service.check_client())
 
-        if payload.image_url:
-            result = await google_service.extract_text_from_url(payload.image_url)
+        if payload.receipt_url:
+            result = await google_service.extract_text_from_url(payload.receipt_url)
         elif payload.image_base64:
             result = await google_service.extract_text_from_base64(payload.image_base64)
         else:
