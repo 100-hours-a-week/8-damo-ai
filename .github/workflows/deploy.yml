@@ -150,6 +150,7 @@ jobs:
              export PATH=/usr/local/bin:/usr/bin:/snap/bin:\$PATH && \
              source ~/.bashrc 2>/dev/null || true && \
              aws ssm get-parameter --name '/damo/ai/DEV_ENV' --with-decryption --query 'Parameter.Value' --output text > /home/ubuntu/.env && \
+             aws ssm get-parameter --name '/damo/ai/DEV_ENV2' --with-decryption --query 'Parameter.Value' --output text >> /home/ubuntu/.env && \
              echo '' >> /home/ubuntu/.env && \
              echo 'ECR_REPO=${{ env.ECR_REPO }}' >> /home/ubuntu/.env && \
              echo 'IMAGE_TAG=${{ env.IMAGE_TAG }}' >> /home/ubuntu/.env && \
