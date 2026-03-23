@@ -11,7 +11,7 @@ from shared.stream.service import KafkaService
 # [EOS]     get_transactional_publisher,
 # [EOS]     set_transactional_publisher,
 # [EOS] )
-# [EOS] from shared.checkpoint import init_checkpointer, close_checkpointer
+from shared.checkpoint import init_checkpointer, close_checkpointer
 from shared.database.db_manager import DBManager
 from shared.schemas.stream_schema import (
     RecommendationRequestPayload,
@@ -59,27 +59,117 @@ app = AsgiFastStream(
     ],
 )
 
+_recommendation_semaphore: asyncio.Semaphore | None = None
 
-# [EOS] @app.on_startup
-# [EOS] async def on_startup() -> None:
-# [EOS]     await init_checkpointer(settings.CHECKPOINT_DB_PATH)
-# [EOS]     publisher = TransactionalPublisher(
-# [EOS]         bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS,
-# [EOS]         transactional_id=settings.KAFKA_TRANSACTIONAL_ID,
-# [EOS]         group_id=settings.KAFKA_GROUP_ID,
-# [EOS]     )
-# [EOS]     await publisher.start()
-# [EOS]     set_transactional_publisher(publisher)
-# [EOS]
-# [EOS] @app.on_shutdown
-# [EOS] async def on_shutdown() -> None:
-# [EOS]     publisher = get_transactional_publisher()
-# [EOS]     if publisher:
-# [EOS]         await publisher.stop()
-# [EOS]     await close_checkpointer()
+
+@app.on_startup
+async def on_startup() -> None:
+    global _recommendation_semaphore
+    _recommendation_semaphore = asyncio.Semaphore(3)  # 동시 처리 최대 3개
+    await init_checkpointer(settings.CHECKPOINT_DB_PATH)
+
+
+@app.on_shutdown
+async def on_shutdown() -> None:
+    tasks = [
+        t for t in asyncio.all_tasks()
+        if t is not asyncio.current_task() and not t.done()
+    ]
+    if tasks:
+        logger.info("진행 중인 태스크 %d개 완료 대기...", len(tasks))
+        await asyncio.gather(*tasks, return_exceptions=True)
+    await close_checkpointer()
+
+
+def _log_task_exception(task: asyncio.Task) -> None:
+    if not task.cancelled() and (exc := task.exception()):
+        logger.exception("백그라운드 추천 태스크 오류", exc_info=exc)
 
 
 # ── 1. 회식 추천 ─────────────────────────────────────────────────────────────
+async def _process_recommendation(
+    event: RecommendationRequestPayload, message: object
+) -> None:
+    async with _recommendation_semaphore:
+        dining_id = event.payload.dining_data.dining_id
+        try:
+            correlation_id = str(getattr(message, "correlation_id", "unknown"))
+
+            async def on_persona_speak(entry: dict) -> None:
+                await service.publish_recommendation_streaming(
+                    data=RecommendationStreamingPayload(
+                        event_id=event.event_id,
+                        event_type=EventType.RECOMMENDATION_STREAMING.value,
+                        payload=RecommendationStreamingData(
+                            dining_id=dining_id,
+                            user_id=int(entry.get("user_id", 0)),
+                            content=entry.get("content", ""),
+                        ),
+                    )
+                )
+
+            result = await recommendation_task(
+                event.payload,
+                correlation_id,
+                "recommend",
+                on_persona_speak=on_persona_speak,
+            )
+            if result is None:
+                logger.error("recommendation_task returned None: dining_id=%s", dining_id)
+                return
+
+            db = DBManager()
+            await db.save_dining_session(result)
+
+            db.set_collection("dining_sessions")
+            updated_doc = await db.update_phase_count(
+                filter_query={"diningId": dining_id}, field_name="currentPhase"
+            )
+            current_count = updated_doc.get("currentPhase", 1) if updated_doc else 1
+
+            items = [
+                RecommendedItem(
+                    restaurant_id=r["restaurant_id"],
+                    reasoning_description=r.get("reason", r.get("place_name", "")),
+                )
+                for r in result.get("final_selection", [])
+            ]
+            response_payload = RecommendationResponsePayload(
+                event_id=event.event_id,
+                event_type=EventType.RECOMMENDATION_RESPONSE.value,
+                payload=RecommendationResponseData(
+                    dining_id=dining_id,
+                    recommendation_count=current_count,
+                    recommended_items=items,
+                ),
+            )
+            await service.publish_recommendation_response(
+                event=event, message=message, data=response_payload.payload
+            )
+            # [EOS] 아래 블록은 EOS 활성화 시 위 라인을 대체한다:
+            # [EOS] incoming_headers = list(dict(message.headers).items()) if message.headers else []
+            # [EOS] raw = message.raw_message
+            # [EOS] publisher = get_transactional_publisher()
+            # [EOS] if publisher:
+            # [EOS]     await publisher.publish(
+            # [EOS]         topic=TopicType.RECOMMENDATION_RESPONSE.value,
+            # [EOS]         value=response_payload,
+            # [EOS]         key=raw.key,
+            # [EOS]         headers=incoming_headers,
+            # [EOS]         consumer_topic=raw.topic,
+            # [EOS]         consumer_partition=raw.partition,
+            # [EOS]         consumer_offset=raw.offset,
+            # [EOS]     )
+
+            logger.info(
+                "recommendation 응답 발행 완료: dining_id=%s, items=%d개",
+                dining_id,
+                len(items),
+            )
+        except Exception:
+            logger.exception("handle_recommendation 오류: dining_id=%s", dining_id)
+
+
 @broker.subscriber(
     service.get_recommendation_request_topic(),
     group_id=settings.KAFKA_GROUP_ID,
@@ -92,87 +182,88 @@ async def handle_recommendation(
         "recommendation 요청 수신: dining_id=%s", event.payload.dining_data.dining_id
     )
     await message.ack()
-    try:
-        correlation_id = str(getattr(message, "correlation_id", "unknown"))
-        dining_id = event.payload.dining_data.dining_id
-
-        async def on_persona_speak(entry: dict) -> None:
-            await service.publish_recommendation_streaming(
-                data=RecommendationStreamingPayload(
-                    event_id=event.event_id,
-                    event_type=EventType.RECOMMENDATION_STREAMING.value,
-                    payload=RecommendationStreamingData(
-                        dining_id=dining_id,
-                        user_id=int(entry.get("user_id", 0)),
-                        content=entry.get("content", ""),
-                    ),
-                )
-            )
-
-        result = await recommendation_task(
-            event.payload,
-            correlation_id,
-            "recommend",
-            on_persona_speak=on_persona_speak,
-        )
-        if result is None:
-            logger.error("recommendation_task returned None: dining_id=%s", dining_id)
-            return
-
-        db = DBManager()
-        await db.save_dining_session(result)
-
-        db.set_collection("dining_sessions")
-        updated_doc = await db.update_phase_count(
-            filter_query={"diningId": dining_id}, field_name="currentPhase"
-        )
-        current_count = updated_doc.get("currentPhase", 1) if updated_doc else 1
-
-        items = [
-            RecommendedItem(
-                restaurant_id=r["restaurant_id"],
-                reasoning_description=r.get("reason", r.get("place_name", "")),
-            )
-            for r in result.get("final_selection", [])
-        ]
-        response_payload = RecommendationResponsePayload(
-            event_id=event.event_id,
-            event_type=EventType.RECOMMENDATION_RESPONSE.value,
-            payload=RecommendationResponseData(
-                dining_id=dining_id,
-                recommendation_count=current_count,
-                recommended_items=items,
-            ),
-        )
-        await service.publish_recommendation_response(
-            event=event, message=message, data=response_payload.payload
-        )
-        # [EOS] 아래 블록은 EOS 활성화 시 위 라인을 대체한다:
-        # [EOS] incoming_headers = list(dict(message.headers).items()) if message.headers else []
-        # [EOS] raw = message.raw_message
-        # [EOS] publisher = get_transactional_publisher()
-        # [EOS] if publisher:
-        # [EOS]     await publisher.publish(
-        # [EOS]         topic=TopicType.RECOMMENDATION_RESPONSE.value,
-        # [EOS]         value=response_payload,
-        # [EOS]         key=raw.key,
-        # [EOS]         headers=incoming_headers,
-        # [EOS]         consumer_topic=raw.topic,
-        # [EOS]         consumer_partition=raw.partition,
-        # [EOS]         consumer_offset=raw.offset,
-        # [EOS]     )
-
-        logger.info(
-            "recommendation 응답 발행 완료: dining_id=%s, items=%d개",
-            dining_id,
-            len(items),
-        )
-    except Exception:
-        logger.exception("handle_recommendation 오류")
-        raise
+    task = asyncio.create_task(_process_recommendation(event, message))
+    task.add_done_callback(_log_task_exception)
 
 
 # ── 2. 회식 재추천 ───────────────────────────────────────────────────────────
+async def _process_recommendation_refresh(
+    event: RecommendationRefreshRequestPayload, message: object
+) -> None:
+    async with _recommendation_semaphore:
+        dining_id = event.payload.dining_data.dining_id
+        try:
+            correlation_id = str(getattr(message, "correlation_id", "unknown"))
+
+            async def on_persona_speak(entry: dict) -> None:
+                await service.publish_recommendation_streaming(
+                    data=RecommendationStreamingPayload(
+                        event_id=event.event_id,
+                        event_type=EventType.RECOMMENDATION_STREAMING.value,
+                        payload=RecommendationStreamingData(
+                            dining_id=dining_id,
+                            user_id=int(entry.get("user_id", 0)),
+                            content=entry.get("content", ""),
+                        ),
+                    )
+                )
+
+            result = await recommendation_task(
+                event.payload, correlation_id, "refresh", on_persona_speak=on_persona_speak
+            )
+            if result is None:
+                logger.error(
+                    "recommendation_task returned None: dining_id=%s", dining_id
+                )
+                return
+
+            db = DBManager()
+            updated_session = await db.save_dining_session(result)
+            current_count = updated_session.get("currentPhase", 1) if updated_session else 1
+
+            items = [
+                RecommendedItem(
+                    restaurant_id=r["restaurant_id"],
+                    reasoning_description=r.get("reason", r.get("place_name", "")),
+                )
+                for r in result.get("final_selection", [])
+            ]
+            response_payload = RecommendationResponsePayload(
+                event_id=event.event_id,
+                event_type=EventType.RECOMMENDATION_RESPONSE.value,
+                payload=RecommendationResponseData(
+                    dining_id=dining_id,
+                    recommendation_count=current_count,
+                    recommended_items=items,
+                ),
+            )
+            await service.publish_recommendation_response(
+                event=event, message=message, data=response_payload.payload
+            )
+            # [EOS] 아래 블록은 EOS 활성화 시 위 라인을 대체한다:
+            # [EOS] incoming_headers = list(dict(message.headers).items()) if message.headers else []
+            # [EOS] raw = message.raw_message
+            # [EOS] publisher = get_transactional_publisher()
+            # [EOS] if publisher:
+            # [EOS]     await publisher.publish(
+            # [EOS]         topic=TopicType.RECOMMENDATION_RESPONSE.value,
+            # [EOS]         value=response_payload,
+            # [EOS]         key=raw.key,
+            # [EOS]         headers=incoming_headers,
+            # [EOS]         consumer_topic=raw.topic,
+            # [EOS]         consumer_partition=raw.partition,
+            # [EOS]         consumer_offset=raw.offset,
+            # [EOS]     )
+
+            logger.info(
+                "recommendation refresh 응답 발행 완료: dining_id=%s, items=%d개",
+                dining_id,
+                len(items),
+            )
+        except Exception:
+            logger.exception("handle_recommendation_refresh 오류: dining_id=%s", dining_id)
+
+
 @broker.subscriber(
     service.get_recommendation_refresh_request_topic(),
     group_id=settings.KAFKA_GROUP_ID,
@@ -186,78 +277,8 @@ async def handle_recommendation_refresh(
         event.payload.dining_data.dining_id,
     )
     await message.ack()
-    try:
-        correlation_id = str(getattr(message, "correlation_id", "unknown"))
-        dining_id = event.payload.dining_data.dining_id
-
-        async def on_persona_speak(entry: dict) -> None:
-            await service.publish_recommendation_streaming(
-                data=RecommendationStreamingPayload(
-                    event_id=event.event_id,
-                    event_type=EventType.RECOMMENDATION_STREAMING.value,
-                    payload=RecommendationStreamingData(
-                        dining_id=dining_id,
-                        user_id=int(entry.get("user_id", 0)),
-                        content=entry.get("content", ""),
-                    ),
-                )
-            )
-
-        result = await recommendation_task(
-            event.payload, correlation_id, "refresh", on_persona_speak=on_persona_speak
-        )
-        if result is None:
-            logger.error(
-                "recommendation_task returned None: dining_id=%s", dining_id
-            )
-            return
-
-        db = DBManager()
-        updated_session = await db.save_dining_session(result)
-        current_count = updated_session.get("currentPhase", 1) if updated_session else 1
-
-        items = [
-            RecommendedItem(
-                restaurant_id=r["restaurant_id"],
-                reasoning_description=r.get("reason", r.get("place_name", "")),
-            )
-            for r in result.get("final_selection", [])
-        ]
-        response_payload = RecommendationResponsePayload(
-            event_id=event.event_id,
-            event_type=EventType.RECOMMENDATION_RESPONSE.value,
-            payload=RecommendationResponseData(
-                dining_id=dining_id,
-                recommendation_count=current_count,
-                recommended_items=items,
-            ),
-        )
-        await service.publish_recommendation_response(
-            event=event, message=message, data=response_payload.payload
-        )
-        # [EOS] 아래 블록은 EOS 활성화 시 위 라인을 대체한다:
-        # [EOS] incoming_headers = list(dict(message.headers).items()) if message.headers else []
-        # [EOS] raw = message.raw_message
-        # [EOS] publisher = get_transactional_publisher()
-        # [EOS] if publisher:
-        # [EOS]     await publisher.publish(
-        # [EOS]         topic=TopicType.RECOMMENDATION_RESPONSE.value,
-        # [EOS]         value=response_payload,
-        # [EOS]         key=raw.key,
-        # [EOS]         headers=incoming_headers,
-        # [EOS]         consumer_topic=raw.topic,
-        # [EOS]         consumer_partition=raw.partition,
-        # [EOS]         consumer_offset=raw.offset,
-        # [EOS]     )
-
-        logger.info(
-            "recommendation refresh 응답 발행 완료: dining_id=%s, items=%d개",
-            dining_id,
-            len(items),
-        )
-    except Exception:
-        logger.exception("handle_recommendation_refresh 오류")
-        raise
+    task = asyncio.create_task(_process_recommendation_refresh(event, message))
+    task.add_done_callback(_log_task_exception)
 
 
 # ── 4. 장소 확정 ─────────────────────────────────────────────────────────────

@@ -1,7 +1,7 @@
 import inspect
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from langchain_core.runnables import RunnableConfig
 from langfuse import observe
@@ -247,18 +247,22 @@ async def persona_factory(state: AgentDialogueState, config: RunnableConfig = No
         logger.warning("[Node1] user_ids가 비어있어 에러 반환")
         return {"is_error": True, "error_message": "user_ids가 비어있습니다."}
 
-    db = DBManager(col_name="users")
-    user_data_list: List[Dict[str, Any]] = []
+    import asyncio
 
-    for uid in user_ids:
+    db = DBManager(col_name="users")
+
+    async def _fetch_user(uid: int) -> Optional[Dict[str, Any]]:
         try:
             doc = await db.read_one({"id": uid})
+            if doc:
+                doc.pop("_id", None)
+            return doc
         except Exception:
             logger.warning("유저 DB 조회 실패: uid=%s", uid, exc_info=True)
-            continue
-        if doc:
-            doc.pop("_id", None)
-            user_data_list.append(doc)
+            return None
+
+    results = await asyncio.gather(*[_fetch_user(uid) for uid in user_ids])
+    user_data_list: List[Dict[str, Any]] = [doc for doc in results if doc is not None]
 
     if not user_data_list:
         logger.warning("[Node1] DB에서 유저 데이터를 찾을 수 없음")

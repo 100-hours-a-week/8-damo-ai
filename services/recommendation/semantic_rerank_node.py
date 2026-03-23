@@ -90,14 +90,20 @@ async def semantic_rerank_node(state: dict[str, Any], config: RunnableConfig = N
         r["final_score"] = r.get("total_score", 0.0) * 0.4 - penalty * 0.2
     logger.info("[SEMANTIC] 기본 final_score 계산 완료 (semantic=0 기준)")
 
-    # 2. basePersona 수집
+    # 2. basePersona 수집 (병렬 조회)
+    import asyncio
     db = DBManager(col_name="users")
-    personas: list[str] = []
-    for uid in state.get("user_ids", []):
-        user = await db.read_one({"id": {"$in": [str(uid), int(uid)]}})
-        if user and user.get("basePersona"):
-            personas.append(user["basePersona"])
-    logger.info("[SEMANTIC] basePersona 수집: %d/%d명 보유", len(personas), len(state.get("user_ids", [])))
+    user_ids = state.get("user_ids", [])
+    results = await asyncio.gather(
+        *[db.read_one({"id": {"$in": [str(uid), int(uid)]}}) for uid in user_ids],
+        return_exceptions=True,
+    )
+    personas: list[str] = [
+        r["basePersona"]
+        for r in results
+        if isinstance(r, dict) and r.get("basePersona")
+    ]
+    logger.info("[SEMANTIC] basePersona 수집: %d/%d명 보유", len(personas), len(user_ids))
 
     if not personas:
         logger.warning("[SEMANTIC] basePersona 없음 → total_score 기준 정렬로 fallback")
