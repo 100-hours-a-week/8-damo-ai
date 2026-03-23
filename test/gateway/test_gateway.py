@@ -19,6 +19,12 @@ def _make_dining_data_dict(**kwargs) -> dict:
     }
 
 
+def _make_message() -> MagicMock:
+    msg = MagicMock()
+    msg.ack = AsyncMock()
+    return msg
+
+
 def _make_event(dining_id: int = 1) -> MagicMock:
     event = MagicMock()
     event.event_id = 1
@@ -66,7 +72,7 @@ class TestHandleRecommendation:
             from gateway.main import handle_recommendation
             event = _make_event()
             mock_logger = MagicMock()
-            mock_message = MagicMock()
+            mock_message = _make_message()
             mock_message.correlation_id = "test-cid"
 
             await handle_recommendation(event, mock_logger, mock_message)
@@ -94,7 +100,7 @@ class TestHandleRecommendation:
             from gateway.main import handle_recommendation
             event = _make_event()
             mock_logger = MagicMock()
-            mock_message = MagicMock()
+            mock_message = _make_message()
 
             await handle_recommendation(event, mock_logger, mock_message)
 
@@ -120,7 +126,7 @@ class TestHandleRecommendation:
 
             from gateway.main import handle_recommendation
             event = _make_event()
-            await handle_recommendation(event, MagicMock(), MagicMock())
+            await handle_recommendation(event, MagicMock(), _make_message())
 
         assert captured_callback is not None
         # 콜백 실제 호출
@@ -145,7 +151,7 @@ class TestHandleRecommendationRefresh:
 
             from gateway.main import handle_recommendation_refresh
             event = _make_event()
-            mock_message = MagicMock()
+            mock_message = _make_message()
 
             await handle_recommendation_refresh(event, MagicMock(), mock_message)
 
