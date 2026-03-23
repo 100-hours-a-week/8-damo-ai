@@ -41,6 +41,7 @@ from services.core_service.modules.persona.task import analyze_persona_task
 from services.recommendation.task import recommendation_task
 from services.recommendation.sub_graphs.fix import fix_task
 from services.core_service.modules.ocr.service import GoogleVisionService
+from shared.storage.bucket_manager import bucket_manager
 
 setup_logging()  # 반드시 다른 서비스 import 전에 호출
 
@@ -318,7 +319,8 @@ async def handle_receipt_ocr(
         logger.debug("google vision client: %s", await google_service.check_client())
 
         if payload.receipt_url:
-            result = await google_service.extract_text_from_url(payload.receipt_url)
+            receipt_url = bucket_manager.get_file_url(payload.receipt_url)
+            result = await google_service.extract_text_from_url(receipt_url)
         elif payload.image_base64:
             result = await google_service.extract_text_from_base64(payload.image_base64)
         else:
