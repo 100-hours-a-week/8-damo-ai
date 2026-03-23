@@ -1,5 +1,8 @@
+import inspect
 import logging
+from typing import Any
 
+from langchain_core.runnables import RunnableConfig
 from langgraph.graph import StateGraph, START, END
 from langgraph.types import Command
 from services.recommendation.state import RecommendationState
@@ -40,8 +43,19 @@ ALLERGY_KEYWORDS = {
 # 거리 그래프
 from shared.database.db_manager import DBManager
 
+
+async def _emit_status(config: RunnableConfig, dining_id: Any, content: str) -> None:
+    configurable = (config or {}).get("configurable") or {}
+    on_speak = configurable.get("on_persona_speak")
+    if not on_speak:
+        return
+    result = on_speak({"user_id": 0, "dining_id": str(dining_id), "content": content})
+    if inspect.isawaitable(result):
+        await result
+
+
 # 거리 노드
-async def distance_node(state: RecommendationState) -> RecommendationState:
+async def distance_node(state: RecommendationState, config: RunnableConfig = None) -> RecommendationState:
     db_manager = DBManager()
     db_manager.set_collection("restaurants")
     dining_id = state.get("dining_data", {}).get("dining_id") or state.get("dining_id")
@@ -49,6 +63,7 @@ async def distance_node(state: RecommendationState) -> RecommendationState:
     _Y = float(state.get("dining_data", {}).get("y"))
     MAX_DISTANCE = 1000 # 1km
 
+    await _emit_status(config, dining_id, "주변 식당을 검색하고 있어요")
     logger.info("[DISTANCE] 시작: dining_id=%s, x=%s, y=%s", dining_id, _X, _Y)
 
     # 1. 거리 가까운 식당 가져오기

@@ -1,7 +1,9 @@
+import inspect
 import logging
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Tuple
 
+from langchain_core.runnables import RunnableConfig
 from langfuse import observe
 
 from shared.database.db_manager import DBManager
@@ -10,6 +12,16 @@ from services.agent_dialogue.app.prompts.langfuse_prompts import get_prompt
 from services.agent_dialogue.app.prompts.persona_templates import PERSONA_SYSTEM_PROMPT
 
 logger = logging.getLogger(__name__)
+
+
+async def _emit_status(config: RunnableConfig, dining_id: Any, content: str) -> None:
+    configurable = (config or {}).get("configurable") or {}
+    on_speak = configurable.get("on_persona_speak")
+    if not on_speak:
+        return
+    result = on_speak({"user_id": 0, "dining_id": str(dining_id), "content": content})
+    if inspect.isawaitable(result):
+        await result
 
 _FEEDBACK_MARKER = "## 이전 추천 피드백\n"
 _FEEDBACK_FOOTER = "위 피드백을 참고하여, 이번 대화에서는 유저의 실제 취향에 더 가까운 의견을 내세요."
@@ -222,11 +234,13 @@ def _build_persona_prompt(user: Dict[str, Any]) -> str:
 
 
 @observe(name="persona_factory")
-async def persona_factory(state: AgentDialogueState) -> dict:
+async def persona_factory(state: AgentDialogueState, config: RunnableConfig = None) -> dict:
     """Node 1: user_ids로 DB에서 유저 데이터 조회 후 페르소나 프롬프트 생성.
     재추천 시 self_evolution 로직을 통합 실행하여 few-shot 피드백을 주입한다.
     """
     user_ids = state.get("user_ids", [])
+    dining_id = state.get("dining_data", {}).get("dining_id") or state.get("dining_id", 0)
+    await _emit_status(config, dining_id, "팀원 페르소나를 구성하고 있어요")
     logger.info("[Node1] persona_factory 시작: user_ids=%s", user_ids)
 
     if not user_ids:

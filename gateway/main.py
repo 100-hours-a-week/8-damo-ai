@@ -322,16 +322,23 @@ async def handle_receipt_ocr(
         elif payload.image_base64:
             result = await google_service.extract_text_from_base64(payload.image_base64)
         else:
-            logger.error("handle_receipt_ocr: image_url과 image_base64 모두 없음")
+            logger.error("handle_receipt_ocr: receipt_url과 image_base64 모두 없음")
             return
 
         if not result["success"]:
             logger.error("OCR 처리 실패: %s", result["error"])
             return
 
+        is_matched = payload.restaurant_name in result["full_text"]
+        logger.info(
+            "OCR 식당명 매칭: restaurant_name=%s, matched=%s",
+            payload.restaurant_name,
+            is_matched,
+        )
+
         response_data = ReceiptOCRResponseData(
-            full_text=result["full_text"],
-            process_time=result["process_time"],
+            dining_id=payload.dining_id,
+            success=is_matched,
         )
         await service.publish_receipt_ocr_response(
             event=event, message=message, data=response_data

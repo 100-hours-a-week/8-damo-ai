@@ -6,14 +6,27 @@
 recommend.py의 기존 allergy_node/ALLERGY_KEYWORDS는 수정하지 않음.
 """
 
+import inspect
 import logging
+from typing import Any
 
+from langchain_core.runnables import RunnableConfig
 from langgraph.graph import StateGraph, START, END
 
 from services.recommendation.state import RecommendationState
 from shared.database.db_manager import DBManager
 
 logger = logging.getLogger(__name__)
+
+
+async def _emit_status(config: RunnableConfig, dining_id: Any, content: str) -> None:
+    configurable = (config or {}).get("configurable") or {}
+    on_speak = configurable.get("on_persona_speak")
+    if not on_speak:
+        return
+    result = on_speak({"user_id": 0, "dining_id": str(dining_id), "content": content})
+    if inspect.isawaitable(result):
+        await result
 
 # ─── 알러지 키워드 매핑 (recommend.py와 동일, 독립 유지) ──────────────────────
 
@@ -153,7 +166,7 @@ def _is_hard_exclude(user_datas: list[dict], restaurant: dict) -> bool:
 
 # ─── 알러지 노드 ──────────────────────────────────────────────────────────────
 
-async def allergy_node(state: RecommendationState) -> dict:
+async def allergy_node(state: RecommendationState, config: RunnableConfig = None) -> dict:
     """알러지 소프트 패널티 계산 노드.
 
     - 유저 DB 조회 → 알러지 목록 수집
@@ -162,6 +175,8 @@ async def allergy_node(state: RecommendationState) -> dict:
     - filtered_restaurant에 결과를 포함하여 반환 (state 포함 필수)
     """
     user_ids = state.get("user_ids", [])
+    dining_id = state.get("dining_id", 0)
+    await _emit_status(config, dining_id, "알러지 정보를 확인하고 있어요")
     logger.info("[ALLERGY] 시작: user_ids=%s", user_ids)
 
     db = DBManager()

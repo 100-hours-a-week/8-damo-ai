@@ -6,13 +6,25 @@ Review 노드가 없는 Phase 1에서는 graceful fallback으로 동작하고,
 리뷰 인덱싱 완료 후 자동으로 정상 동작한다.
 """
 
+import inspect
 import logging
 from typing import Any
 
+from langchain_core.runnables import RunnableConfig
 from shared.database.db_manager import DBManager
 from shared.database.neo4j_client import Neo4jClient
 
 logger = logging.getLogger(__name__)
+
+
+async def _emit_status(config: RunnableConfig, dining_id: Any, content: str) -> None:
+    configurable = (config or {}).get("configurable") or {}
+    on_speak = configurable.get("on_persona_speak")
+    if not on_speak:
+        return
+    result = on_speak({"user_id": 0, "dining_id": str(dining_id), "content": content})
+    if inspect.isawaitable(result):
+        await result
 
 
 async def _get_embedding(text: str) -> list[float]:
@@ -53,7 +65,7 @@ async def _fetch_semantic_scores(
         return {r["rid"]: r["avg_score"] async for r in result}
 
 
-async def semantic_rerank_node(state: dict[str, Any]) -> dict[str, Any]:
+async def semantic_rerank_node(state: dict[str, Any], config: RunnableConfig = None) -> dict[str, Any]:
     """유저 페르소나 임베딩 기반 시맨틱 재정렬 노드.
 
     흐름:
@@ -67,6 +79,8 @@ async def semantic_rerank_node(state: dict[str, Any]) -> dict[str, Any]:
         logger.info("[SEMANTIC] filtered_restaurant 비어있음 → skip")
         return {}
 
+    dining_id = state.get("dining_id", 0)
+    await _emit_status(config, dining_id, "취향에 맞는 식당을 분석하고 있어요")
     logger.info("[SEMANTIC] 시작: 식당=%d개, user_ids=%s", len(filtered), state.get("user_ids"))
 
     # 1. 기본 final_score (semantic=0 가정)

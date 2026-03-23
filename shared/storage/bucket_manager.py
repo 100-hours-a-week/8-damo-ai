@@ -65,5 +65,15 @@ class BucketManager:
             logger.error(f"Error reading object: {e}")
             return None
 
+    def get_file_url(self, key: str) -> str:
+        """S3 key로 접근 가능한 public URL 반환.
+
+        예: get_file_url("s3/images/dining/receipt/abc")
+            → "https://dev.damo.today/s3/images/dining/receipt/abc"
+        """
+        base = os.getenv('S3_PUBLIC_BASE_URL', 'https://dev.damo.today').rstrip('/')
+        path = key.lstrip('/')
+        return f"{base}/{path}"
+
 # 싱글톤 패턴으로 인스턴스 제공
 bucket_manager = BucketManager()
