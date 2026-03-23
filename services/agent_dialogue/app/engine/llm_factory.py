@@ -1,3 +1,4 @@
+import os
 from typing import Any
 
 from langchain_core.language_models import BaseChatModel
@@ -15,6 +16,10 @@ def get_chat_llm(temperature: float = 0.7, local: bool = False) -> BaseChatModel
     각각 OPENAI_BASE_URL / LOCAL_BASE_URL이 설정되면
     해당 엔드포인트로 요청한다.
     (LiteLLM 프록시, vLLM, Ollama 등 OpenAI 호환 서버 지원)
+
+    LLM_NO_KEEPALIVE=1 환경변수 설정 시 httpx keepalive 비활성화.
+    asyncio.run()을 반복 호출하는 평가 도구 등에서 이벤트 루프 간
+    stale 커넥션 문제를 방지한다.
     """
     if local and settings.LOCAL_MODEL:
         kwargs: dict[str, Any] = {
@@ -36,4 +41,11 @@ def get_chat_llm(temperature: float = 0.7, local: bool = False) -> BaseChatModel
         }
         if settings.OPENAI_BASE_URL:
             kwargs["base_url"] = settings.OPENAI_BASE_URL
+
+    if os.environ.get("LLM_NO_KEEPALIVE"):
+        import httpx
+        kwargs["http_async_client"] = httpx.AsyncClient(
+            limits=httpx.Limits(max_keepalive_connections=0)
+        )
+
     return ChatOpenAI(**kwargs)

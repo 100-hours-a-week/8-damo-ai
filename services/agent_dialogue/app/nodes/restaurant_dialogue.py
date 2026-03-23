@@ -10,6 +10,7 @@ from langchain_core.runnables import RunnableConfig
 from langfuse import get_client, observe
 from services.agent_dialogue.app.engine.state import AgentDialogueState
 from services.agent_dialogue.app.engine.llm_factory import get_chat_llm
+from shared.database.neo4j_client import Neo4jClient
 from shared.utils.config import settings
 from services.agent_dialogue.app.prompts.langfuse_prompts import (
     get_chat_prompt,
@@ -116,11 +117,45 @@ def _format_restaurant_info(
     return "\n".join(lines), allergy_info
 
 
+async def _fetch_allergy_chain(
+    place_name: str,
+) -> List[Tuple[str, List[str]]]:
+    """Neo4j Menu→Ingredient→Allergy 체인으로 메뉴별 성분·알레르기 조회.
+
+    체인 데이터가 없거나 Neo4j 연결 실패 시 빈 리스트 반환 (fallback 용).
+    """
+    try:
+        driver = await Neo4jClient.get_driver()
+        async with driver.session() as session:
+            result = await session.run(
+                """
+                MATCH (r:Restaurant)-[:HAS_MENU]->(m:Menu)
+                      -[:CONTAINS]->(i:Ingredient)
+                      -[:TRIGGERS]->(a:Allergy)
+                WHERE r.place_name =~ $name_pattern
+                RETURN m.title AS menu_title,
+                       collect(DISTINCT i.name + '(' + a.name + ')') AS warnings
+                ORDER BY menu_title
+                """,
+                name_pattern=f"(?i).*{re.escape(place_name.strip())}.*",
+            )
+            rows = [(r["menu_title"], r["warnings"]) async for r in result]
+        return rows
+    except Exception:
+        logger.debug("[Node3] Neo4j 알레르기 체인 조회 실패: %s", place_name)
+        return []
+
+
 def _format_allergy_info(
     user_data_list: List[Dict[str, Any]],
     allergy_info: str,
+    chain_rows: Optional[List[Tuple[str, List[str]]]] = None,
 ) -> str:
-    """참여자 알레르기 목록 + 식당 메뉴 정보를 합산."""
+    """참여자 알레르기 목록 + 식당 메뉴 정보를 합산.
+
+    chain_rows가 있으면 메뉴별 성분·알레르기 체인을 사용하고,
+    없으면 기존 메뉴 제목 나열 방식으로 fallback한다.
+    """
     lines = []
     for user in user_data_list:
         nickname = user.get("nickname", "?")
@@ -129,7 +164,13 @@ def _format_allergy_info(
             lines.append(f"- {nickname}: {', '.join(allergies)}")
     if not lines:
         lines.append("알레르기 정보 없음")
-    lines.append(f"\n{allergy_info}")
+
+    if chain_rows:
+        lines.append("\n[메뉴별 성분·알레르기]")
+        for title, warnings in chain_rows:
+            lines.append(f"- {title}: {', '.join(warnings)}")
+    else:
+        lines.append(f"\n{allergy_info}")
     return "\n".join(lines)
 
 
@@ -284,8 +325,13 @@ async def restaurant_dialogue(state: AgentDialogueState, config: RunnableConfig)
 
     # 1. 식당 데이터 포맷
     restaurant_info, raw_allergy = _format_restaurant_info(restaurant, dining_data)
-    allergy_info = _format_allergy_info(user_data_list, raw_allergy)
+    chain_rows = await _fetch_allergy_chain(place_name)
+    allergy_info = _format_allergy_info(user_data_list, raw_allergy, chain_rows)
     dining_info = _format_dining_info(dining_data)
+    if chain_rows:
+        logger.info("[Node3] 알레르기 체인 적용: %s (%d개 메뉴)", place_name, len(chain_rows))
+    else:
+        logger.debug("[Node3] 알레르기 체인 없음 (fallback): %s", place_name)
 
     # 2. 분석가 발언 생성 (API LLM)
     try:
@@ -348,9 +394,9 @@ async def restaurant_dialogue(state: AgentDialogueState, config: RunnableConfig)
             vote = await _persona_vote(system_prompt, analyst_speech, all_reactions)
         except Exception:
             logger.warning(
-                "[Node3] 페르소나 투표 실패: user_id=%s", user_id, exc_info=True
+                "[Node3] 페르소나 투표 실패 (스킵): user_id=%s", user_id, exc_info=True
             )
-            vote = {"approve": False, "reasoning": "투표 실패"}
+            continue  # 실패한 투표는 카운트에서 제외
 
         vote_results.append(
             {
