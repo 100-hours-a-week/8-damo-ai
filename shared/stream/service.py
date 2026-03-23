@@ -55,6 +55,7 @@ class KafkaService:
             middlewares=[self.middleware],
             parser=safe_header_parser,
             client_id=self.settings.KAFKA_CLIENT_ID,
+            max_poll_interval_ms=1_800_000,  # 30분: 장시간 처리 중 rebalance 방지
         )
         self._recommendation_response_publisher = self.broker.publisher(
             TopicType.RECOMMENDATION_RESPONSE.value

@@ -141,7 +141,8 @@ async def _fetch_allergy_chain(
             )
             rows = [(r["menu_title"], r["warnings"]) async for r in result]
         return rows
-    except Exception:
+    except BaseException:
+        # asyncio.CancelledError (Python 3.8+는 BaseException) 등 모든 예외를 잡아 fallback
         logger.debug("[Node3] Neo4j 알레르기 체인 조회 실패: %s", place_name)
         return []
 

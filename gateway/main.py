@@ -83,7 +83,7 @@ app = AsgiFastStream(
 @broker.subscriber(
     service.get_recommendation_request_topic(),
     group_id=settings.KAFKA_GROUP_ID,
-    # [EOS] no_ack=True,  # EOS 활성화 시 재설정 필요
+    no_ack=True,
 )
 async def handle_recommendation(
     event: RecommendationRequestPayload, logger: Logger, message=Context()
@@ -91,6 +91,7 @@ async def handle_recommendation(
     logger.info(
         "recommendation 요청 수신: dining_id=%s", event.payload.dining_data.dining_id
     )
+    await message.ack()
     try:
         correlation_id = str(getattr(message, "correlation_id", "unknown"))
         dining_id = event.payload.dining_data.dining_id
@@ -175,7 +176,7 @@ async def handle_recommendation(
 @broker.subscriber(
     service.get_recommendation_refresh_request_topic(),
     group_id=settings.KAFKA_GROUP_ID,
-    # [EOS] no_ack=True,  # EOS 활성화 시 재설정 필요
+    no_ack=True,
 )
 async def handle_recommendation_refresh(
     event: RecommendationRefreshRequestPayload, logger: Logger, message=Context()
@@ -184,6 +185,7 @@ async def handle_recommendation_refresh(
         "recommendation refresh 요청 수신: dining_id=%s",
         event.payload.dining_data.dining_id,
     )
+    await message.ack()
     try:
         correlation_id = str(getattr(message, "correlation_id", "unknown"))
         dining_id = event.payload.dining_data.dining_id
